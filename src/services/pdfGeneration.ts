@@ -3,8 +3,8 @@ import autoTable from 'jspdf-autotable';
 import QRCode from 'qrcode';
 
 // Constant VPA from user
-const UPI_VPA = '1975thilak-1@okicici';
-const MERCHANT_NAME = 'Gokilam Travels'; // Or 'Thilak Sambath' based on screenshot, but company name is safer
+const UPI_VPA = '9842548549-1@okbizaxis';
+const MERCHANT_NAME = 'SRI GOKILAM TRAVELS'; // Or 'Thilak Sambath' based on screenshot, but company name is safer
 
 export interface InvoiceData {
   customerTitle: string;
@@ -62,23 +62,39 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   const fileName = `${billNo}_${cleanCustomerName}.pdf`;
 
   // --- Header ---
-  // Company Name
-  doc.setFontSize(22);
-  doc.setTextColor(41, 128, 185); // Blue color scheme
-  doc.text('Gokilam Travels', 105, 20, { align: 'center' });
+  // Top info bar - GSTN, PAN, State
+  doc.setFontSize(8);
+  doc.setTextColor(60, 60, 60); // Dark gray
+  doc.text('GSTIN : 33AIYPB0965B2ZF', 15, 15);
+  doc.text('PAN No. : AIYPB0965B', 70, 15);
+  doc.text('State Name : TAMIL NADU', 125, 15);
+  doc.text('Code : 33', 180, 15);
 
-  // Company Details
-  doc.setFontSize(10);
-  doc.setTextColor(80);
-  doc.text('30, Gokhale Street, Ram Nagar,', 105, 28, { align: 'center' });
-  doc.text('Coimbatore - 641009', 105, 33, { align: 'center' });
-  doc.text('Email: gokilam1950@gmail.com', 105, 38, { align: 'center' });
-  doc.text('Phone: 94436 82900, 82202 62205', 105, 43, { align: 'center' });
+  // Company Name - SRI GOKILAM TRAVELS (Maroon/Brown color)
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(139, 0, 0); // Dark red/maroon color
+  doc.text('SRI GOKILAM TRAVELS', 105, 25, { align: 'center' });
+
+  // Company Address and Contact Details
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(0, 0, 0); // Black
+  doc.text('No.5, Sai Sruthi Complex, Ramar Kovil Street, Ram Nagar, Coimbatore - 641 009.', 105, 32, { align: 'center' });
+  doc.setFontSize(8);
+  doc.text('Cell : 98425 48549, 94436 82900, 70102 99197', 105, 37, { align: 'center' });
+  doc.text('E-mail : srigokilamtravels2006@gmail.com', 105, 42, { align: 'center' });
+
+  // Availability message
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.text('AVAILABLE IN ALL TYPES OF A/C - NON A/C TOURIST VEHICLES', 105, 48, { align: 'center' });
 
   // Divider Line
+  doc.setFont('helvetica', 'normal');
   doc.setLineWidth(0.5);
-  doc.setDrawColor(200);
-  doc.line(15, 48, 195, 48);
+  doc.setDrawColor(0, 0, 0); // Black border
+  doc.line(15, 51, 195, 51);
 
   // --- Invoice Info ---
   doc.setFontSize(10);
@@ -86,47 +102,42 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
 
   // Left Side: Bill To
   doc.setFont('helvetica', 'bold');
-  doc.text('Bill To:', 15, 58);
+  doc.text('Bill To:', 15, 61);
   doc.setFont('helvetica', 'normal');
+  doc.setTextColor(0, 0, 0); // Black color to match reference
 
-  let currentY = 64;
+  let currentY = 67;
   const lineHeight = 5;
-
-
+  const labelX = 15;
+  const colonX = 55; // Position where all colons align
+  const valueX = 58; // Position where values start (after colon and space)
 
   const fullCustomerName = data.customerTitle ? `${data.customerTitle}. ${data.customerName}` : data.customerName;
-  doc.text(`Customer Name: ${fullCustomerName || '-'}`, 15, currentY);
+  doc.text('Customer Name', labelX, currentY);
+  doc.text(':', colonX, currentY);
+  doc.text(fullCustomerName || '-', valueX, currentY);
   currentY += lineHeight;
 
   if (data.customerCompanyName) {
-    doc.text(`Company: ${data.customerCompanyName}`, 15, currentY);
+    doc.text('Company', labelX, currentY);
+    doc.text(':', colonX, currentY);
+    doc.text(data.customerCompanyName, valueX, currentY);
     currentY += lineHeight;
   }
 
   if (data.customerAddress) {
+    doc.text('Address', labelX, currentY);
+    doc.text(':', colonX, currentY);
     // Split address into lines if too long - extend to right column boundary
-    const addressLines = doc.splitTextToSize(`Address: ${data.customerAddress}`, 115);
-    doc.text(addressLines, 15, currentY);
+    const addressLines = doc.splitTextToSize(data.customerAddress, 70);
+    doc.text(addressLines, valueX, currentY);
     currentY += (lineHeight * addressLines.length);
   }
 
   if (data.customerGstNo) {
-    doc.text(`GST No: ${data.customerGstNo}`, 15, currentY);
-    currentY += lineHeight;
-  }
-
-  doc.text(`Vehicle No: ${data.vehicleNo || '-'}`, 15, currentY);
-  currentY += lineHeight;
-  doc.text(`Driver Name: ${data.driverName || '-'}`, 15, currentY);
-  currentY += lineHeight;
-
-  if (data.tripStartLocation) {
-    doc.text(`From: ${data.tripStartLocation}`, 15, currentY);
-    currentY += lineHeight;
-  }
-
-  if (data.tripEndLocation) {
-    doc.text(`To: ${data.tripEndLocation}`, 15, currentY);
+    doc.text('GST No', labelX, currentY);
+    doc.text(':', colonX, currentY);
+    doc.text(data.customerGstNo, valueX, currentY);
     currentY += lineHeight;
   }
 
@@ -134,16 +145,65 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
 
   // Right Side: Invoice Details
   const rightColX = 130;
+  const rightColonX = 155; // Position where colons align
+  const rightValueX = 158; // Position  where values start
+
   doc.setFont('helvetica', 'bold');
-  doc.text('Invoice Details:', rightColX, 58);
+  doc.text('Invoice Details:', rightColX, 61);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Bill No: ${billNo}`, rightColX, 64);
-  doc.text(`Date: ${now.toLocaleDateString()}`, rightColX, 70);
-  doc.text(`Time: ${now.toLocaleTimeString()}`, rightColX, 76);
+  doc.setTextColor(0, 0, 0); // Black color to match reference
+
+  let rightY = 67;
+
+  doc.text('Bill No', rightColX, rightY);
+  doc.text(':', rightColonX, rightY);
+  doc.text(billNo, rightValueX, rightY);
+  rightY += lineHeight;
+
+  doc.text('Date', rightColX, rightY);
+  doc.text(':', rightColonX, rightY);
+  doc.text(now.toLocaleDateString(), rightValueX, rightY);
+  rightY += lineHeight;
+
+  doc.text('Time', rightColX, rightY);
+  doc.text(':', rightColonX, rightY);
+  doc.text(now.toLocaleTimeString(), rightValueX, rightY);
+  rightY += lineHeight;
+
+  doc.text('Vehicle No', rightColX, rightY);
+  doc.text(':', rightColonX, rightY);
+  doc.text(data.vehicleNo || '-', rightValueX, rightY);
+  rightY += lineHeight;
+
+  if (data.vehicleType) {
+    doc.text('Vehicle Type', rightColX, rightY);
+    doc.text(':', rightColonX, rightY);
+    doc.text(data.vehicleType, rightValueX, rightY);
+    rightY += lineHeight;
+  }
+
+  doc.text('Driver Name', rightColX, rightY);
+  doc.text(':', rightColonX, rightY);
+  doc.text(data.driverName || '-', rightValueX, rightY);
+  rightY += lineHeight;
+
+  if (data.tripStartLocation) {
+    doc.text('From', rightColX, rightY);
+    doc.text(':', rightColonX, rightY);
+    doc.text(data.tripStartLocation, rightValueX, rightY);
+    rightY += lineHeight;
+  }
+
+  if (data.tripEndLocation) {
+    doc.text('To', rightColX, rightY);
+    doc.text(':', rightColonX, rightY);
+    doc.text(data.tripEndLocation, rightValueX, rightY);
+    rightY += lineHeight;
+  }
 
   // --- Trip Details Section ---
   // Adjust starting Y dynamically based on left column height if needed, but usually Trip Details is lower
-  const tripDetailsY = Math.max(currentY + 5, 82);
+  const tripDetailsY = Math.max(currentY + 5, 85);
 
   // Increased height to accommodate more trip details
   doc.setFillColor(245, 247, 250);
@@ -320,8 +380,15 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   }
 
   if (data.enableGst) {
-    doc.text(`GST (${data.gstPercentage}%):`, totalsXLabel, finalY);
-    doc.text(`Rs:${data.gstAmount.toFixed(2)}`, totalsXValue, finalY, { align: 'right' });
+    const halfGstPercentage = data.gstPercentage / 2;
+    const halfGstAmount = data.gstAmount / 2;
+
+    doc.text(`CGST (${halfGstPercentage}%):`, totalsXLabel, finalY);
+    doc.text(`Rs:${halfGstAmount.toFixed(2)}`, totalsXValue, finalY, { align: 'right' });
+    finalY += 7;
+
+    doc.text(`SGST (${halfGstPercentage}%):`, totalsXLabel, finalY);
+    doc.text(`Rs:${halfGstAmount.toFixed(2)}`, totalsXValue, finalY, { align: 'right' });
     finalY += 7;
   }
 
