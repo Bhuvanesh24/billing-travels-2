@@ -6,6 +6,79 @@ import QRCode from 'qrcode';
 const UPI_VPA = '9842548549-1@okbizaxis';
 const MERCHANT_NAME = 'SRI GOKILAM TRAVELS'; // Or 'Thilak Sambath' based on screenshot, but company name is safer
 
+// Number to words conversion for Indian currency
+const numberToWords = (num: number): string => {
+  if (num === 0) return 'Zero Rupees Only';
+
+  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+
+  const convertLessThanThousand = (n: number): string => {
+    if (n === 0) return '';
+    if (n < 10) return ones[n];
+    if (n < 20) return teens[n - 10];
+    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + ones[n % 10] : '');
+    return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' And ' + convertLessThanThousand(n % 100) : '');
+  };
+
+  let integerPart = Math.floor(num);
+  const decimalPart = Math.round((num - Math.floor(num)) * 100);
+
+  let words = '';
+
+  if (integerPart >= 10000000) {
+    const crores = Math.floor(integerPart / 10000000);
+    words += convertLessThanThousand(crores) + ' Crore ';
+    integerPart %= 10000000;
+  }
+
+  if (integerPart >= 100000) {
+    const lakhs = Math.floor(integerPart / 100000);
+    words += convertLessThanThousand(lakhs) + ' Lakh ';
+    integerPart %= 100000;
+  }
+
+  if (integerPart >= 1000) {
+    const thousands = Math.floor(integerPart / 1000);
+    words += convertLessThanThousand(thousands) + ' Thousand ';
+    integerPart %= 1000;
+  }
+
+  if (integerPart > 0) {
+    words += convertLessThanThousand(integerPart);
+  }
+
+  words = words.trim() + ' Rupees';
+
+  if (decimalPart > 0) {
+    words += ' And ' + convertLessThanThousand(decimalPart) + ' Paise';
+  }
+
+  return words.trim() + ' Only';
+};
+
+// Format date to dd/mm/yyyy
+const formatDate = (date: Date | string): string => {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const day = d.getDate().toString().padStart(2, '0');
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
+// Format datetime to dd/mm/yyyy, hh:mm:ss AM/PM
+const formatDateTime = (date: Date | string): string => {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const dateStr = formatDate(d);
+  const hours = d.getHours();
+  const minutes = d.getMinutes().toString().padStart(2, '0');
+  const seconds = d.getSeconds().toString().padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const hour12 = hours % 12 || 12;
+  return `${dateStr}, ${hour12}:${minutes}:${seconds} ${ampm}`;
+};
+
 export interface InvoiceData {
   customerTitle: string;
   customerName: string;
@@ -82,13 +155,22 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   doc.setTextColor(0, 0, 0); // Black
   doc.text('No.5, Sai Sruthi Complex, Ramar Kovil Street, Ram Nagar, Coimbatore - 641 009.', 105, 32, { align: 'center' });
   doc.setFontSize(8);
+
+  // Phone numbers in blue and bold
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(41, 128, 185); // Blue color
   doc.text('Cell : 98425 48549, 94436 82900, 70102 99197', 105, 37, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(0, 0, 0); // Back to black
   doc.text('E-mail : srigokilamtravels2006@gmail.com', 105, 42, { align: 'center' });
 
-  // Availability message
+  // Availability message in dark red/brown
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
+  doc.setTextColor(139, 0, 0); // Dark red/maroon color like company name
   doc.text('AVAILABLE IN ALL TYPES OF A/C - NON A/C TOURIST VEHICLES', 105, 48, { align: 'center' });
+  doc.setTextColor(0, 0, 0); // Reset to black
 
   // Divider Line
   doc.setFont('helvetica', 'normal');
@@ -102,9 +184,10 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
 
   // Left Side: Bill To
   doc.setFont('helvetica', 'bold');
+  doc.setTextColor(41, 128, 185); // Blue color for heading
   doc.text('Bill To:', 15, 61);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(0, 0, 0); // Black color to match reference
+  doc.setTextColor(0, 0, 0); // Black color for content
 
   let currentY = 67;
   const lineHeight = 5;
@@ -149,25 +232,16 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   const rightValueX = 158; // Position  where values start
 
   doc.setFont('helvetica', 'bold');
+  doc.setTextColor(41, 128, 185); // Blue color for heading
   doc.text('Invoice Details:', rightColX, 61);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(0, 0, 0); // Black color to match reference
+  doc.setTextColor(0, 0, 0); // Black color for content
 
   let rightY = 67;
 
   doc.text('Bill No', rightColX, rightY);
   doc.text(':', rightColonX, rightY);
   doc.text(billNo, rightValueX, rightY);
-  rightY += lineHeight;
-
-  doc.text('Date', rightColX, rightY);
-  doc.text(':', rightColonX, rightY);
-  doc.text(now.toLocaleDateString(), rightValueX, rightY);
-  rightY += lineHeight;
-
-  doc.text('Time', rightColX, rightY);
-  doc.text(':', rightColonX, rightY);
-  doc.text(now.toLocaleTimeString(), rightValueX, rightY);
   rightY += lineHeight;
 
   doc.text('Vehicle No', rightColX, rightY);
@@ -187,77 +261,76 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   doc.text(data.driverName || '-', rightValueX, rightY);
   rightY += lineHeight;
 
-  if (data.tripStartLocation) {
-    doc.text('From', rightColX, rightY);
-    doc.text(':', rightColonX, rightY);
-    doc.text(data.tripStartLocation, rightValueX, rightY);
-    rightY += lineHeight;
-  }
-
-  if (data.tripEndLocation) {
-    doc.text('To', rightColX, rightY);
-    doc.text(':', rightColonX, rightY);
-    doc.text(data.tripEndLocation, rightValueX, rightY);
-    rightY += lineHeight;
-  }
-
   // --- Trip Details Section ---
-  // Adjust starting Y dynamically based on left column height if needed, but usually Trip Details is lower
-  const tripDetailsY = Math.max(currentY + 5, 85);
+  const tripDetailsY = Math.max(currentY + 5, rightY + 5, 85);
 
-  // Increased height to accommodate more trip details
-  doc.setFillColor(245, 247, 250);
-  doc.roundedRect(15, tripDetailsY, 180, 35, 2, 2, 'F');
-
-  const tripTextY = tripDetailsY + 6;
-  const tripValueY = tripDetailsY + 12;
-  const tripTextY2 = tripDetailsY + 20;
-  const tripValueY2 = tripDetailsY + 26;
-
-  doc.setFontSize(9);
-
-  // First Row - Trip Times and Location
-  doc.setFont('helvetica', 'normal');
-  doc.text('Trip Start', 20, tripTextY);
+  // Trip Details heading in blue
   doc.setFont('helvetica', 'bold');
-  const startTimeText = data.startTime ? new Date(data.startTime).toLocaleString() : '-';
-  doc.text(startTimeText, 20, tripValueY);
-
+  doc.setTextColor(41, 128, 185); // Blue color for heading
+  doc.text('Trip Details:', 15, tripDetailsY);
   doc.setFont('helvetica', 'normal');
-  doc.text('Trip End', 70, tripTextY);
-  doc.setFont('helvetica', 'bold');
-  const endTimeText = data.endTime ? new Date(data.endTime).toLocaleString() : '-';
-  doc.text(endTimeText, 70, tripValueY);
+  doc.setTextColor(0, 0, 0);
 
-  doc.setFont('helvetica', 'normal');
-  doc.text('Vehicle Type', 120, tripTextY);
-  doc.setFont('helvetica', 'bold');
-  doc.text(data.vehicleType || '-', 120, tripValueY);
+  let tripY = tripDetailsY + 6;
+  const leftColX = 15;
+  const leftColonX = 55;
+  const leftValueX = 58;
+  const rightTripColX = 130;
+  const rightTripColonX = 155;
+  const rightTripValueX = 158;
 
-  doc.setFont('helvetica', 'normal');
-  doc.text('KM Reading', 165, tripTextY);
-  doc.setFontSize(7);
-  doc.text(`Start: ${data.startKm} km`, 165, tripValueY);
-  doc.text(`Closing: ${data.endKm} km`, 165, tripValueY + 4);
-  doc.setFontSize(9);
+  // Row 1: From | Trip Start
+  doc.text('From', leftColX, tripY);
+  doc.text(':', leftColonX, tripY);
+  doc.text(data.tripStartLocation || '-', leftValueX, tripY);
 
+  doc.text('Trip Start', rightTripColX, tripY);
+  doc.text(':', rightTripColonX, tripY);
+  const startTimeText = data.startTime ? formatDateTime(data.startTime) : '-';
+  doc.text(startTimeText, rightTripValueX, tripY);
+  tripY += lineHeight;
 
-  // Second Row - KM Details
-  doc.setFont('helvetica', 'normal');
-  doc.text('Total KM', 20, tripTextY2);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`${data.totalKm} km`, 20, tripValueY2);
+  // Row 2: To | Trip End
+  doc.text('To', leftColX, tripY);
+  doc.text(':', leftColonX, tripY);
+  doc.text(data.tripEndLocation || '-', leftValueX, tripY);
+
+  doc.text('Trip End', rightTripColX, tripY);
+  doc.text(':', rightTripColonX, tripY);
+  const endTimeText = data.endTime ? formatDateTime(data.endTime) : '-';
+  doc.text(endTimeText, rightTripValueX, tripY);
+  tripY += lineHeight;
+
+  // Row 3: Start KM | End KM
+  doc.text('Start KM', leftColX, tripY);
+  doc.text(':', leftColonX, tripY);
+  doc.text(`${data.startKm} km`, leftValueX, tripY);
+
+  doc.text('End KM', rightTripColX, tripY);
+  doc.text(':', rightTripColonX, tripY);
+  doc.text(`${data.endKm} km`, rightTripValueX, tripY);
+  tripY += lineHeight;
+
+  // Row 4: Total KM | Free KM
+  doc.text('Total KM', leftColX, tripY);
+  doc.text(':', leftColonX, tripY);
+  doc.text(`${data.totalKm} km`, leftValueX, tripY);
 
   if (data.freeKm > 0) {
-    doc.setFont('helvetica', 'normal');
-    doc.text('Free KM', 70, tripTextY2);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`${data.freeKm} km`, 70, tripValueY2);
+    doc.text('Free KM', rightTripColX, tripY);
+    doc.text(':', rightTripColonX, tripY);
+    doc.text(`${data.freeKm} km`, rightTripValueX, tripY);
+    tripY += lineHeight;
 
-    doc.setFont('helvetica', 'normal');
-    doc.text('Chargeable KM', 120, tripTextY2);
+    // Row 5: Chargeable KM (highlighted, bold)
     doc.setFont('helvetica', 'bold');
-    doc.text(`${data.chargeableKm} km`, 120, tripValueY2);
+    doc.text('Chargeable KM', leftColX, tripY);
+    doc.text(':', leftColonX, tripY);
+    doc.text(`${data.chargeableKm} km`, leftValueX, tripY);
+    doc.setFont('helvetica', 'normal');
+    tripY += lineHeight;
+  } else {
+    tripY += lineHeight;
   }
 
 
@@ -322,30 +395,37 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
     tableBody.push([rentDescription, rentAmount.toFixed(2)]);
   }
 
-  // 2. Additional Costs
+  // 2. Additional Costs (NON-TAXABLE)
   data.additionalCosts.forEach(cost => {
     tableBody.push([cost.label, cost.amount.toFixed(2)]);
   });
 
   autoTable(doc, {
-    startY: tripDetailsY + 41,  // Adjusted for larger trip details box (35px height + 6px padding)
+    startY: tripY + 10,  // Start after trip details
     head: [['Description', 'Amount (Rs)']],
     body: tableBody,
-    theme: 'striped',
+    theme: 'plain',
     headStyles: {
-      fillColor: [41, 128, 185],
-      textColor: 255,
-      fontStyle: 'bold'
+      fillColor: [255, 255, 255],
+      textColor: [0, 0, 0],
+      fontStyle: 'bold',
+      fontSize: 10,
+      lineWidth: 0.5,
+      lineColor: [0, 0, 0]
     },
     styles: {
-      fontSize: 10,
-      cellPadding: 5,
+      fontSize: 9,
+      cellPadding: 3,
       lineColor: [200, 200, 200],
       lineWidth: 0.1,
     },
     columnStyles: {
-      0: { cellWidth: 'auto' }, // Description
-      1: { cellWidth: 50, halign: 'right' } // Amount
+      0: { cellWidth: 'auto', halign: 'left' }, // Description
+      1: { cellWidth: 45, halign: 'right' } // Amount
+    },
+    bodyStyles: {
+      lineWidth: 0.1,
+      lineColor: [220, 220, 220]
     }
   });
 
@@ -354,75 +434,175 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   let finalY = (doc as any).lastAutoTable.finalY + 10;
 
   // Check if we need a new page for totals
-  if (finalY > 240) {
+  if (finalY > 200) {
     doc.addPage();
     finalY = 20;
   }
 
-  const totalsXLabel = 130;
-  const totalsXValue = 190;
-
-  // Subtotal calculation from table body to be safe, or just use what we have? 
-  // Let's rely on the passed-in grand total logic mostly, but we can reconstruct subtotal for display.
-  const subtotal = tableBody.reduce((sum, row) => sum + parseFloat(row[1] as string), 0);
-
-  doc.setFont('helvetica', 'normal');
-  doc.text('Subtotal:', totalsXLabel, finalY);
-  doc.text(`Rs:${subtotal.toFixed(2)}`, totalsXValue, finalY, { align: 'right' });
-  finalY += 7;
-
-  if (data.enableDiscount) {
-    doc.setTextColor(200, 0, 0); // Red
-    doc.text('Discount:', totalsXLabel, finalY);
-    doc.text(`-Rs:${data.discountAmount.toFixed(2)}`, totalsXValue, finalY, { align: 'right' });
-    doc.setTextColor(0);
-    finalY += 7;
+  // Calculate TAXABLE amount (only rent items, excluding additional costs)
+  let taxableSubTotal = 0;
+  if (rentAmount > 0) {
+    taxableSubTotal += rentAmount;
+  }
+  // For fixed/hour/day types, the charges were already added to tableBody individually
+  // We need to sum them excluding additional costs
+  const numberOfRentItems = tableBody.length - data.additionalCosts.length;
+  for (let i = 0; i < numberOfRentItems; i++) {
+    taxableSubTotal += parseFloat(tableBody[i][1] as string);
+  }
+  // Subtract the rentAmount we already added if it was counted
+  if (rentAmount > 0) {
+    taxableSubTotal -= rentAmount;
   }
 
+  // Actually, let's recalculate cleanly
+  taxableSubTotal = 0;
+  for (let i = 0; i < numberOfRentItems; i++) {
+    taxableSubTotal += parseFloat(tableBody[i][1] as string);
+  }
+
+  // Calculate NON-TAXABLE amount (additional costs only)
+  let nonTaxableSubTotal = 0;
+  data.additionalCosts.forEach(cost => {
+    nonTaxableSubTotal += cost.amount;
+  });
+
+  // DON'T subtract discount here - it will be shown as a separate line
+  // Calculate total before round-off: taxable + GST + non-taxable - discount - advance
+  const totalBeforeRoundOff = taxableSubTotal + (data.enableGst ? data.gstAmount : 0) + nonTaxableSubTotal - (data.enableDiscount ? data.discountAmount : 0) - data.advance;
+  const roundedTotal = Math.round(totalBeforeRoundOff);
+  const roundOff = roundedTotal - totalBeforeRoundOff;
+  const finalTotal = roundedTotal;
+
+  // Layout: Bank Details (Left) | Totals (Right)
+  const bankDetailsY = finalY;
+
+  // --- Bank Details Section (Left Side) ---
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(41, 128, 185); // Blue color
+  doc.text('Bank Details :', 15, bankDetailsY);
+  doc.setTextColor(0, 0, 0);
+
+  let currentBankY = bankDetailsY + 6;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+
+  doc.text('Name : Karur Vysya Bank', 15, currentBankY);
+  currentBankY += 5;
+  doc.text('A/c. No. : 1121280000000810', 15, currentBankY);
+  currentBankY += 5;
+  doc.text('Branch : Nanjappa Road', 15, currentBankY);
+  currentBankY += 5;
+  doc.text('IFSC Code : KVBL0001121', 15, currentBankY);
+  currentBankY += 5;
+
+  // CHEQUES line below Bank Details
+  doc.setFontSize(9);
+  doc.text('CHEQUES / DD Favouring "SRI GOKILAM TRAVELS" Only', 15, currentBankY);
+  currentBankY += 5;
+
+  // --- Totals Section (Right Side) ---
+  const totalsXLabel = 115;
+  const totalsXValue = 190;
+  let currentTotalsY = finalY;
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+
+  // Taxable Sub Total
+  doc.text('Taxable Sub Total', totalsXLabel, currentTotalsY);
+  doc.text(taxableSubTotal.toFixed(2), totalsXValue, currentTotalsY, { align: 'right' });
+  currentTotalsY += 6;
+
+  // CGST and SGST
   if (data.enableGst) {
     const halfGstPercentage = data.gstPercentage / 2;
     const halfGstAmount = data.gstAmount / 2;
 
-    doc.text(`CGST (${halfGstPercentage}%):`, totalsXLabel, finalY);
-    doc.text(`Rs:${halfGstAmount.toFixed(2)}`, totalsXValue, finalY, { align: 'right' });
-    finalY += 7;
+    doc.text(`CGST ${halfGstPercentage}%`, totalsXLabel, currentTotalsY);
+    doc.text(halfGstAmount.toFixed(2), totalsXValue, currentTotalsY, { align: 'right' });
+    currentTotalsY += 6;
 
-    doc.text(`SGST (${halfGstPercentage}%):`, totalsXLabel, finalY);
-    doc.text(`Rs:${halfGstAmount.toFixed(2)}`, totalsXValue, finalY, { align: 'right' });
-    finalY += 7;
+    doc.text(`SGST ${halfGstPercentage}%`, totalsXLabel, currentTotalsY);
+    doc.text(halfGstAmount.toFixed(2), totalsXValue, currentTotalsY, { align: 'right' });
+    currentTotalsY += 6;
+
+    // Sub Total (after adding GST)
+    const subTotalWithGst = taxableSubTotal + data.gstAmount;
+    doc.text('Grand Sub Total', totalsXLabel, currentTotalsY);
+    doc.text(subTotalWithGst.toFixed(2), totalsXValue, currentTotalsY, { align: 'right' });
+    currentTotalsY += 6;
   }
 
+  // Non-Taxable Sub Total (if any)
+  if (nonTaxableSubTotal > 0) {
+    doc.text('Non Taxable Sub Total', totalsXLabel, currentTotalsY);
+    doc.text(nonTaxableSubTotal.toFixed(2), totalsXValue, currentTotalsY, { align: 'right' });
+    currentTotalsY += 6;
+  }
+
+  // Discount (if any)
+  if (data.enableDiscount && data.discountAmount > 0) {
+    doc.text('Discount', totalsXLabel, currentTotalsY);
+    doc.text(`-${data.discountAmount.toFixed(2)}`, totalsXValue, currentTotalsY, { align: 'right' });
+    currentTotalsY += 6;
+  }
+
+  // Advance (if any)
   if (data.advance > 0) {
-    doc.setTextColor(220, 140, 0); // Amber/Orange color
-    doc.text('Advance:', totalsXLabel, finalY);
-    doc.text(`-Rs:${data.advance.toFixed(2)}`, totalsXValue, finalY, { align: 'right' });
-    doc.setTextColor(0);
-    finalY += 7;
+    doc.text('Advance', totalsXLabel, currentTotalsY);
+    doc.text(`-${data.advance.toFixed(2)}`, totalsXValue, currentTotalsY, { align: 'right' });
+    currentTotalsY += 6;
   }
 
-  // Grand Total Line
-  doc.setLineWidth(0.5);
-  doc.line(totalsXLabel - 5, finalY - 4, 195, finalY - 4);
+  // Round Off
+  doc.text('Round Off', totalsXLabel, currentTotalsY);
+  doc.text(roundOff.toFixed(2), totalsXValue, currentTotalsY, { align: 'right' });
+  currentTotalsY += 8;
 
-  const finalTotal = data.grandTotal - data.advance;
-  doc.setFontSize(12);
+  // Bottom Line Y = Max of bank block or totals block + padding
+  let bottomLineY = Math.max(currentBankY, currentTotalsY) + 7;
+
+  // Divider line before bottom row
+  doc.setLineWidth(0.5);
+  doc.setDrawColor(0, 0, 0);
+  doc.line(15, bottomLineY - 3, 195, bottomLineY - 3);
+
+  // --- Bottom Row: In Words (Left) | Grand Total (Right) ---
+  const amountInWords = numberToWords(finalTotal);
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(8);
+  doc.text('In words:', 15, bottomLineY + 2);
   doc.setFont('helvetica', 'bold');
-  doc.text('Grand Total:', totalsXLabel, finalY + 2);
-  doc.text(`Rs:${finalTotal.toFixed(2)}`, totalsXValue, finalY + 2, { align: 'right' });
+
+  const wordsLines = doc.splitTextToSize(amountInWords, 90);
+  doc.text(wordsLines, 28, bottomLineY + 2);
+
+  // GRAND TOTAL (Right side)
+  doc.setFontSize(12);
+  doc.text('GRAND TOTAL', totalsXLabel, bottomLineY + 2);
+  doc.text(`Rs. ${finalTotal.toFixed(2)}`, totalsXValue, bottomLineY + 2, { align: 'right' });
+
+  finalY = bottomLineY + 8 + (wordsLines.length * 4);
+
+  // Divider line after bottom row (closer spacing)
+  doc.setLineWidth(0.5);
+  doc.line(15, finalY - 7, 195, finalY - 7);
+
+  finalY += 3;
 
 
   // --- UPI QR Code Section ---
-  // Position QR code at the bottom center, above the footer message
-  const pageHeight = doc.internal.pageSize.height;
-  const qrSize = 35;
+  // Position QR code after bank details, with proper spacing
+  const qrSize = 25;
   const qrX = (210 - qrSize) / 2; // Center horizontally (A4 width is 210mm)
-  const qrY = pageHeight - 65; // Position above footer messages
+  const qrY = finalY; // Position after bank details
 
   try {
     // Generate UPI URI
     // upi://pay?pa=...&pn=...&am=...&cu=INR
     // encodeURIComponent is safer
-    const finalTotal = data.grandTotal - data.advance;
     const upiUri = `upi://pay?pa=${UPI_VPA}&pn=${encodeURIComponent(MERCHANT_NAME)}&am=${finalTotal.toFixed(2)}&cu=INR`;
 
     // Generate QR Data URL
@@ -431,11 +611,17 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
     // Add QR Image
     doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
 
-    // Add "Scan to Pay" text
-    doc.setFontSize(9);
+    // Add "Scan to Pay" text (smaller)
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(41, 128, 185);
     doc.text('Open GPay/PhonePe and scan this QR code to pay', 105, qrY + qrSize + 5, { align: 'center' });
+
+    // Add footer messages in single line (very small)
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(100);
+    doc.text('Compute only, valid without signature. Thank you for travelling with us!', 105, qrY + qrSize + 10, { align: 'center' });
 
     // Make QR Clickable (Hyperlink)
     doc.link(qrX, qrY, qrSize, qrSize, { url: upiUri });
@@ -449,13 +635,6 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   }
 
 
-  // Footer Message
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'italic');
-  doc.setTextColor(100);
-  doc.text('Compute only, valid without signature.', 105, pageHeight - 20, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.text('Thank you for travelling with us!', 105, pageHeight - 15, { align: 'center' });
 
   return { blob: doc.output('blob'), fileName };
 };

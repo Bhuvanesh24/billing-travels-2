@@ -68,7 +68,7 @@ export default function InvoiceList() {
   if (!isInitialized) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="animate-spin text-blue-600" size={32} />
+        <Loader2 className="animate-spin" style={{ color: '#8B0000' }} size={32} />
       </div>
     );
   }
@@ -76,16 +76,41 @@ export default function InvoiceList() {
   return (
     <div className="min-h-screen bg-slate-50 p-8">
       <div className="max-w-6xl mx-auto">
-        {/* Company Header */}
-        <div className="bg-white rounded-xl p-6 mb-8 border border-slate-200 shadow-sm text-center">
-          <h1 className="text-3xl font-bold text-blue-600 mb-2">Gokilam Travels</h1>
-          <div className="text-slate-600 text-sm space-y-1">
-            <p>30, Gokhale Street, Ram Nagar, Coimbatore - 641009</p>
-            <div className="flex justify-center gap-4 flex-wrap">
-              <p>📧 gokilam1950@gmail.com</p>
-              <p>📱 94436 82900, 82202 62205</p>
-            </div>
+        {/* Company Header - Matches Invoice Design */}
+        <div className="bg-white rounded-xl p-6 mb-8 border border-slate-200 shadow-sm">
+          {/* Top info bar - GSTIN, PAN, State */}
+          <div className="flex justify-between items-center mb-4 text-xs text-slate-600 flex-wrap gap-2">
+            <span>GSTIN : 33AIYPB0965B2ZF</span>
+            <span>PAN No. : AIYPB0965B</span>
+            <span>State Name : TAMIL NADU</span>
+            <span>Code : 33</span>
           </div>
+
+          {/* Company Name - Maroon/Brown color */}
+          <h1 className="text-4xl font-bold mb-3 text-center" style={{ color: '#8B0000' }}>
+            SRI GOKILAM TRAVELS
+          </h1>
+
+          {/* Company Address and Contact Details */}
+          <div className="text-center space-y-1">
+            <p className="text-sm text-slate-800">
+              No.5, Sai Sruthi Complex, Ramar Kovil Street, Ram Nagar, Coimbatore - 641 009.
+            </p>
+            <p className="text-xs text-slate-700">
+              Cell : 98425 48549, 94436 82900, 70102 99197
+            </p>
+            <p className="text-xs text-slate-700">
+              E-mail : srigokilamtravels2006@gmail.com
+            </p>
+          </div>
+
+          {/* Availability message */}
+          <p className="text-xs font-semibold text-center mt-3 text-slate-800">
+            AVAILABLE IN ALL TYPES OF A/C - NON A/C TOURIST VEHICLES
+          </p>
+
+          {/* Divider Line */}
+          <div className="border-t-2 border-slate-300 mt-4"></div>
         </div>
 
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
@@ -101,7 +126,8 @@ export default function InvoiceList() {
               <input
                 type="text"
                 placeholder="Search invoices..."
-                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 outline-none text-sm"
+                style={{ '--tw-ring-color': '#8B0000' } as React.CSSProperties}
                 value={searchTerm}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -116,7 +142,10 @@ export default function InvoiceList() {
 
             <Link
               to="/create"
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm whitespace-nowrap"
+              className="flex items-center gap-2 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm whitespace-nowrap"
+              style={{ backgroundColor: '#8B0000' }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#A52A2A')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#8B0000')}
             >
               <Plus size={20} />
               New Invoice
@@ -126,7 +155,7 @@ export default function InvoiceList() {
 
         {!isSignedIn ? (
           <div className="bg-white p-12 rounded-xl border border-slate-200 shadow-sm text-center">
-            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#FFF5F5', color: '#8B0000' }}>
               <LogIn size={32} />
             </div>
             <h2 className="text-xl font-semibold text-slate-900 mb-2">Connect to Google Drive</h2>
@@ -145,7 +174,7 @@ export default function InvoiceList() {
           <>
             {loading ? (
               <div className="flex justify-center items-center h-64">
-                <Loader2 className="animate-spin text-blue-600" size={32} />
+                <Loader2 className="animate-spin" style={{ color: '#8B0000' }} size={32} />
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
