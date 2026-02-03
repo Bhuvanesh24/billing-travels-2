@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, Printer, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { calculateSubtotal, calculateGrandTotal, type AdditionalCost, type RentType } from '../lib/calculator';
+import { calculateSubtotal, type AdditionalCost, type RentType } from '../lib/calculator';
 import { useDrive } from '../services/useDrive';
 import { generateInvoicePDF } from '../services/pdfGeneration';
 
@@ -44,6 +44,14 @@ export default function CreateInvoice() {
   const [newCostLabel, setNewCostLabel] = useState('');
   const [newCostAmount, setNewCostAmount] = useState('');
 
+  // Driver Beta & Night Halt
+  const [enableDriverBeta, setEnableDriverBeta] = useState(false);
+  const [driverBetaDays, setDriverBetaDays] = useState(0);
+  const [driverBetaAmountPerDay, setDriverBetaAmountPerDay] = useState(0);
+  const [enableNightHalt, setEnableNightHalt] = useState(false);
+  const [nightHaltDays, setNightHaltDays] = useState(0);
+  const [nightHaltAmountPerDay, setNightHaltAmountPerDay] = useState(0);
+
   // Upload State
   const [uploading, setUploading] = useState(false);
 
@@ -53,6 +61,8 @@ export default function CreateInvoice() {
   const [discountAmount, setDiscountAmount] = useState(0);
   const [enableGst, setEnableGst] = useState(false);
   const [gstPercentage, setGstPercentage] = useState(5);
+  const [enableIgst, setEnableIgst] = useState(false);
+  const [igstPercentage, setIgstPercentage] = useState(5);
   const [advance, setAdvance] = useState(0);
 
   // Computed Values - Auto-calculate from Start/End KM
@@ -74,14 +84,34 @@ export default function CreateInvoice() {
     }
   })();
 
-  const subtotal = calculateSubtotal(rentTotal, additionalCosts);
+  // Calculate Driver Beta and Night Halt totals
+  const driverBetaTotal = enableDriverBeta ? driverBetaDays * driverBetaAmountPerDay : 0;
+  const nightHaltTotal = enableNightHalt ? nightHaltDays * nightHaltAmountPerDay : 0;
 
-  const { gstAmount, grandTotal } = calculateGrandTotal(
-    subtotal,
-    enableDiscount ? discountAmount : 0,
-    enableGst,
-    gstPercentage / 100
-  );
+  // Base subtotal (rent + additional costs)
+  const baseSubtotal = calculateSubtotal(rentTotal, additionalCosts);
+
+  // Add Driver Beta and Night Halt to get full subtotal
+  const subtotal = baseSubtotal + driverBetaTotal + nightHaltTotal;
+
+  // Calculate GST or IGST (mutually exclusive)
+  let gstAmount = 0;
+  let igstAmount = 0;
+  let grandTotal = subtotal;
+
+  // Apply discount first
+  if (enableDiscount) {
+    grandTotal -= discountAmount;
+  }
+
+  // Apply GST or IGST
+  if (enableGst) {
+    gstAmount = grandTotal * (gstPercentage / 100);
+    grandTotal += gstAmount;
+  } else if (enableIgst) {
+    igstAmount = grandTotal * (igstPercentage / 100);
+    grandTotal += igstAmount;
+  }
 
   const addCost = () => {
     if (!newCostLabel || !newCostAmount) return;
@@ -131,6 +161,7 @@ export default function CreateInvoice() {
         await signIn();
       }
 
+
       // 1. Prepare Invoice Data
       const invoiceData = {
         customerTitle,
@@ -161,11 +192,20 @@ export default function CreateInvoice() {
         chargePerKmFixed,
         chargePerKmHour,
         additionalCosts,
+        enableDriverBeta,
+        driverBetaDays,
+        driverBetaAmountPerDay,
+        enableNightHalt,
+        nightHaltDays,
+        nightHaltAmountPerDay,
         enableDiscount,
         discountAmount,
         enableGst,
         gstPercentage,
         gstAmount,
+        enableIgst,
+        igstPercentage,
+        igstAmount,
         advance,
         grandTotal
       };
@@ -567,7 +607,64 @@ export default function CreateInvoice() {
               )}
             </div>
 
-            {/* 3. Additional Costs */}
+            {/* 3. Driver Beta & Night Halt */}
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-10 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer transition-colors ${enableDriverBeta ? 'bg-blue-600' : ''}`} onClick={() => setEnableDriverBeta(!enableDriverBeta)}>
+                    <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${enableDriverBeta ? 'translate-x-4' : ''}`}></div>
+                  </div>
+                  <span className="text-sm font-medium text-slate-700">Driver Beta</span>
+                </div>
+                {enableDriverBeta && (
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      placeholder="Days"
+                      className="w-20 px-3 py-1 border border-slate-300 rounded-lg text-sm"
+                      value={driverBetaDays || ''}
+                      onChange={e => setDriverBetaDays(Number(e.target.value))}
+                    />
+                    <input
+                      type="number"
+                      placeholder="₹/day"
+                      className="w-24 px-3 py-1 border border-slate-300 rounded-lg text-sm"
+                      value={driverBetaAmountPerDay || ''}
+                      onChange={e => setDriverBetaAmountPerDay(Number(e.target.value))}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-10 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer transition-colors ${enableNightHalt ? 'bg-blue-600' : ''}`} onClick={() => setEnableNightHalt(!enableNightHalt)}>
+                    <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${enableNightHalt ? 'translate-x-4' : ''}`}></div>
+                  </div>
+                  <span className="text-sm font-medium text-slate-700">Night Halt</span>
+                </div>
+                {enableNightHalt && (
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      placeholder="Days"
+                      className="w-20 px-3 py-1 border border-slate-300 rounded-lg text-sm"
+                      value={nightHaltDays || ''}
+                      onChange={e => setNightHaltDays(Number(e.target.value))}
+                    />
+                    <input
+                      type="number"
+                      placeholder="₹/day"
+                      className="w-24 px-3 py-1 border border-slate-300 rounded-lg text-sm"
+                      value={nightHaltAmountPerDay || ''}
+                      onChange={e => setNightHaltAmountPerDay(Number(e.target.value))}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 4. Additional Costs */}
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
               <h2 className="text-lg font-semibold mb-4 text-slate-800">Additional Costs</h2>
 
@@ -635,7 +732,7 @@ export default function CreateInvoice() {
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className={`w-10 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer transition-colors ${enableGst ? 'bg-blue-600' : ''}`} onClick={() => setEnableGst(!enableGst)}>
+                  <div className={`w-10 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer transition-colors ${enableGst ? 'bg-blue-600' : ''}`} onClick={() => { setEnableGst(!enableGst); if (!enableGst) setEnableIgst(false); }}>
                     <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${enableGst ? 'translate-x-4' : ''}`}></div>
                   </div>
                   <span className="text-sm font-medium text-slate-700">Add GST</span>
@@ -648,6 +745,29 @@ export default function CreateInvoice() {
                       className="w-20 px-3 py-1 border border-slate-300 rounded-lg text-sm"
                       value={gstPercentage || ''}
                       onChange={e => setGstPercentage(Number(e.target.value))}
+                      min="0"
+                      max="100"
+                    />
+                    <span className="text-sm text-slate-500">%</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-10 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer transition-colors ${enableIgst ? 'bg-blue-600' : ''}`} onClick={() => { setEnableIgst(!enableIgst); if (!enableIgst) setEnableGst(false); }}>
+                    <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${enableIgst ? 'translate-x-4' : ''}`}></div>
+                  </div>
+                  <span className="text-sm font-medium text-slate-700">Other State GST (IGST)</span>
+                </div>
+                {enableIgst && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      placeholder="%"
+                      className="w-20 px-3 py-1 border border-slate-300 rounded-lg text-sm"
+                      value={igstPercentage || ''}
+                      onChange={e => setIgstPercentage(Number(e.target.value))}
                       min="0"
                       max="100"
                     />
@@ -687,6 +807,18 @@ export default function CreateInvoice() {
                     <span>₹{cost.amount.toFixed(2)}</span>
                   </div>
                 ))}
+                {enableDriverBeta && driverBetaTotal > 0 && (
+                  <div className="flex justify-between text-slate-400">
+                    <span>Driver Beta ({driverBetaDays}d)</span>
+                    <span>₹{driverBetaTotal.toFixed(2)}</span>
+                  </div>
+                )}
+                {enableNightHalt && nightHaltTotal > 0 && (
+                  <div className="flex justify-between text-slate-400">
+                    <span>Night Halt ({nightHaltDays}d)</span>
+                    <span>₹{nightHaltTotal.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between font-medium pt-2 text-white">
                   <span>Subtotal</span>
                   <span>₹{subtotal.toFixed(2)}</span>
@@ -704,6 +836,12 @@ export default function CreateInvoice() {
                   <div className="flex justify-between text-slate-300 text-sm">
                     <span>GST ({gstPercentage}%)</span>
                     <span>₹{gstAmount.toFixed(2)}</span>
+                  </div>
+                )}
+                {enableIgst && (
+                  <div className="flex justify-between text-slate-300 text-sm">
+                    <span>IGST ({igstPercentage}%)</span>
+                    <span>₹{igstAmount.toFixed(2)}</span>
                   </div>
                 )}
                 {advance > 0 && (

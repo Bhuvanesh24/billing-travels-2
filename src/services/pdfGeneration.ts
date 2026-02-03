@@ -110,11 +110,20 @@ export interface InvoiceData {
   chargePerKmHour: number;
   fuelChargePerKm: number;
   additionalCosts: { label: string; amount: number }[];
+  enableDriverBeta: boolean;
+  driverBetaDays: number;
+  driverBetaAmountPerDay: number;
+  enableNightHalt: boolean;
+  nightHaltDays: number;
+  nightHaltAmountPerDay: number;
   enableDiscount: boolean;
   discountAmount: number;
   enableGst: boolean;
   gstPercentage: number;
   gstAmount: number;
+  enableIgst: boolean;
+  igstPercentage: number;
+  igstAmount: number;
   advance: number;
   grandTotal: number;
 }
@@ -190,7 +199,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   doc.setTextColor(0, 0, 0); // Black color for content
 
   let currentY = 67;
-  const lineHeight = 5;
+  const lineHeight = 4;
   const labelX = 15;
   const colonX = 55; // Position where all colons align
   const valueX = 58; // Position where values start (after colon and space)
@@ -271,7 +280,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(0, 0, 0);
 
-  let tripY = tripDetailsY + 6;
+  let tripY = tripDetailsY + 5;
   const leftColX = 15;
   const leftColonX = 55;
   const leftValueX = 58;
@@ -400,8 +409,20 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
     tableBody.push([cost.label, cost.amount.toFixed(2)]);
   });
 
+  // 3. Driver Beta (NON-TAXABLE)
+  if (data.enableDriverBeta) {
+    const driverBetaTotal = data.driverBetaDays * data.driverBetaAmountPerDay;
+    tableBody.push([`Driver Beta (${data.driverBetaDays} days @ Rs${data.driverBetaAmountPerDay}/day)`, driverBetaTotal.toFixed(2)]);
+  }
+
+  // 4. Night Halt (NON-TAXABLE)
+  if (data.enableNightHalt) {
+    const nightHaltTotal = data.nightHaltDays * data.nightHaltAmountPerDay;
+    tableBody.push([`Night Halt (${data.nightHaltDays} days @ Rs${data.nightHaltAmountPerDay}/day)`, nightHaltTotal.toFixed(2)]);
+  }
+
   autoTable(doc, {
-    startY: tripY + 10,  // Start after trip details
+    startY: tripY + 5,  // Start after trip details (reduced from 10)
     head: [['Description', 'Amount (Rs)']],
     body: tableBody,
     theme: 'plain',
@@ -415,7 +436,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
     },
     styles: {
       fontSize: 9,
-      cellPadding: 3,
+      cellPadding: 2,
       lineColor: [200, 200, 200],
       lineWidth: 0.1,
     },
@@ -461,15 +482,29 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
     taxableSubTotal += parseFloat(tableBody[i][1] as string);
   }
 
-  // Calculate NON-TAXABLE amount (additional costs only)
+  // Calculate NON-TAXABLE amount (additional costs + driver beta + night halt)
   let nonTaxableSubTotal = 0;
+
+  // Additional costs
   data.additionalCosts.forEach(cost => {
     nonTaxableSubTotal += cost.amount;
   });
 
+  // Driver Beta
+  if (data.enableDriverBeta) {
+    nonTaxableSubTotal += data.driverBetaDays * data.driverBetaAmountPerDay;
+  }
+
+  // Night Halt
+  if (data.enableNightHalt) {
+    nonTaxableSubTotal += data.nightHaltDays * data.nightHaltAmountPerDay;
+  }
+
   // DON'T subtract discount here - it will be shown as a separate line
-  // Calculate total before round-off: taxable + GST + non-taxable - discount - advance
-  const totalBeforeRoundOff = taxableSubTotal + (data.enableGst ? data.gstAmount : 0) + nonTaxableSubTotal - (data.enableDiscount ? data.discountAmount : 0) - data.advance;
+  // Calculate total before round-off: taxable + GST/IGST + non-taxable - discount - advance
+  // Use IGST if enabled, otherwise use regular GST
+  const gstOrIgstAmount = data.enableIgst ? data.igstAmount : (data.enableGst ? data.gstAmount : 0);
+  const totalBeforeRoundOff = taxableSubTotal + gstOrIgstAmount + nonTaxableSubTotal - (data.enableDiscount ? data.discountAmount : 0) - data.advance;
   const roundedTotal = Math.round(totalBeforeRoundOff);
   const roundOff = roundedTotal - totalBeforeRoundOff;
   const finalTotal = roundedTotal;
@@ -497,10 +532,49 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   doc.text('IFSC Code : KVBL0001121', 15, currentBankY);
   currentBankY += 5;
 
-  // CHEQUES line below Bank Details
-  doc.setFontSize(9);
-  doc.text('CHEQUES / DD Favouring "SRI GOKILAM TRAVELS" Only', 15, currentBankY);
+  // UPI ID below IFSC
+  const upiVpa = import.meta.env.VITE_UPI_VPA || 'your-upi@bank';
+  doc.text(`UPI ID : ${upiVpa}`, 15, currentBankY);
   currentBankY += 5;
+
+  // CHEQUES/DD line (below UPI ID)
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text('CHEQUES / DD Favouring "SRI GOKILAM TRAVELS" Only', 15, currentBankY);
+  currentBankY += 7; // Extra space before QR
+
+  // --- UPI QR Code (Below CHEQUES line) ---
+  const qrSize = 30;
+  const qrX = 15; // Left-aligned with Bank Details
+  const qrY = currentBankY; // Position below CHEQUES
+
+  try {
+    // Generate UPI URI
+    const upiUri = `upi://pay?pa=${UPI_VPA}&pn=${encodeURIComponent(MERCHANT_NAME)}&am=${finalTotal.toFixed(2)}&cu=INR`;
+
+    // Generate QR Data URL
+    const qrDataUrl = await QRCode.toDataURL(upiUri, { errorCorrectionLevel: 'H' });
+
+    // Add QR Image below CHEQUES line
+    doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+
+    // Make QR Clickable (Hyperlink)
+    doc.link(qrX, qrY, qrSize, qrSize, { url: upiUri });
+
+  } catch (err) {
+    console.error('Error generating QR code:', err);
+  }
+
+  // Scan instruction below QR (centered to QR)
+  currentBankY = qrY + qrSize + 2;
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(100);
+  const qrCenterX = qrX + (qrSize / 2); // Center of QR code
+  doc.text('Scan this QR code to pay', qrCenterX, currentBankY, { align: 'center' });
+  currentBankY += 5;
+
 
   // --- Totals Section (Right Side) ---
   const totalsXLabel = 115;
@@ -511,11 +585,11 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   doc.setFont('helvetica', 'normal');
 
   // Taxable Sub Total
-  doc.text('Taxable Sub Total', totalsXLabel, currentTotalsY);
+  doc.text('Sub Total', totalsXLabel, currentTotalsY);
   doc.text(taxableSubTotal.toFixed(2), totalsXValue, currentTotalsY, { align: 'right' });
   currentTotalsY += 6;
 
-  // CGST and SGST
+  // CGST and SGST (regular GST)
   if (data.enableGst) {
     const halfGstPercentage = data.gstPercentage / 2;
     const halfGstAmount = data.gstAmount / 2;
@@ -528,10 +602,23 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
     doc.text(halfGstAmount.toFixed(2), totalsXValue, currentTotalsY, { align: 'right' });
     currentTotalsY += 6;
 
-    // Sub Total (after adding GST)
+    // Grand Sub Total (after adding GST)
     const subTotalWithGst = taxableSubTotal + data.gstAmount;
-    doc.text('Grand Sub Total', totalsXLabel, currentTotalsY);
+    doc.text('Taxable Sub Total', totalsXLabel, currentTotalsY);
     doc.text(subTotalWithGst.toFixed(2), totalsXValue, currentTotalsY, { align: 'right' });
+    currentTotalsY += 6;
+  }
+
+  // IGST (other state GST) - mutually exclusive with regular GST
+  if (data.enableIgst) {
+    doc.text(`IGST ${data.igstPercentage}%`, totalsXLabel, currentTotalsY);
+    doc.text(data.igstAmount.toFixed(2), totalsXValue, currentTotalsY, { align: 'right' });
+    currentTotalsY += 6;
+
+    // Grand Sub Total (after adding IGST)
+    const subTotalWithIgst = taxableSubTotal + data.igstAmount;
+    doc.text('Taxable Sub Total', totalsXLabel, currentTotalsY);
+    doc.text(subTotalWithIgst.toFixed(2), totalsXValue, currentTotalsY, { align: 'right' });
     currentTotalsY += 6;
   }
 
@@ -590,51 +677,13 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   doc.setLineWidth(0.5);
   doc.line(15, finalY - 7, 195, finalY - 7);
 
-  finalY += 3;
 
-
-  // --- UPI QR Code Section ---
-  // Position QR code after bank details, with proper spacing
-  const qrSize = 25;
-  const qrX = (210 - qrSize) / 2; // Center horizontally (A4 width is 210mm)
-  const qrY = finalY; // Position after bank details
-
-  try {
-    // Generate UPI URI
-    // upi://pay?pa=...&pn=...&am=...&cu=INR
-    // encodeURIComponent is safer
-    const upiUri = `upi://pay?pa=${UPI_VPA}&pn=${encodeURIComponent(MERCHANT_NAME)}&am=${finalTotal.toFixed(2)}&cu=INR`;
-
-    // Generate QR Data URL
-    const qrDataUrl = await QRCode.toDataURL(upiUri, { errorCorrectionLevel: 'H' });
-
-    // Add QR Image
-    doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
-
-    // Add "Scan to Pay" text (smaller)
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(41, 128, 185);
-    doc.text('Open GPay/PhonePe and scan this QR code to pay', 105, qrY + qrSize + 5, { align: 'center' });
-
-    // Add footer messages in single line (very small)
-    doc.setFontSize(6);
-    doc.setFont('helvetica', 'italic');
-    doc.setTextColor(100);
-    doc.text('Compute only, valid without signature. Thank you for travelling with us!', 105, qrY + qrSize + 10, { align: 'center' });
-
-    // Make QR Clickable (Hyperlink)
-    doc.link(qrX, qrY, qrSize, qrSize, { url: upiUri });
-
-  } catch (err) {
-    console.error('Error generating QR code:', err);
-    // Fallback text if QR fails
-    doc.setFontSize(8);
-    doc.setTextColor(255, 0, 0);
-    doc.text('Error generating QR Code', 105, qrY + 10, { align: 'center' });
-  }
-
-
+  // Footer messages at the very bottom
+  doc.setFontSize(6);
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(100);
+  const pageHeight = doc.internal.pageSize.height;
+  doc.text('Compute only, valid without signature. Thank you for travelling with us!', 105, pageHeight - 10, { align: 'center' });
 
   return { blob: doc.output('blob'), fileName };
 };
