@@ -5,6 +5,7 @@ import QRCode from 'qrcode';
 // Constant VPA from user
 const UPI_VPA = '9842548549-1@okbizaxis';
 const MERCHANT_NAME = 'SRI GOKILAM TRAVELS'; // Or 'Thilak Sambath' based on screenshot, but company name is safer
+const FONT_STYLE = 'calibri';
 
 // Number to words conversion for Indian currency
 const numberToWords = (num: number): string => {
@@ -154,51 +155,57 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
 
   // Company Name - SRI GOKILAM TRAVELS (Maroon/Brown color)
   doc.setFontSize(20);
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(FONT_STYLE, 'bold');
   doc.setTextColor(139, 0, 0); // Dark red/maroon color
   doc.text('SRI GOKILAM TRAVELS', 105, 25, { align: 'center' });
 
   // Company Address and Contact Details
   doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
+  doc.setFont(FONT_STYLE, 'normal');
   doc.setTextColor(0, 0, 0); // Black
   doc.text('No.5, Sai Sruthi Complex, Ramar Kovil Street, Ram Nagar, Coimbatore - 641 009.', 105, 32, { align: 'center' });
   doc.setFontSize(8);
 
   // Phone numbers in blue and bold
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(FONT_STYLE, 'bold');
   doc.setTextColor(41, 128, 185); // Blue color
   doc.text('Cell : 98425 48549, 94436 82900, 70102 99197', 105, 37, { align: 'center' });
 
-  doc.setFont('helvetica', 'normal');
+  doc.setFont(FONT_STYLE, 'normal');
   doc.setTextColor(0, 0, 0); // Back to black
   doc.text('E-mail : srigokilamtravels2006@gmail.com', 105, 42, { align: 'center' });
 
   // Availability message in dark red/brown
   doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(FONT_STYLE, 'bold');
   doc.setTextColor(139, 0, 0); // Dark red/maroon color like company name
-  doc.text('AVAILABLE IN ALL TYPES OF A/C - NON A/C TOURIST VEHICLES', 105, 48, { align: 'center' });
+  doc.text('AVAILABLE IN ALL TYPES OF TOURIST CAB OPERATORS', 105, 48, { align: 'center' });
   doc.setTextColor(0, 0, 0); // Reset to black
 
   // Divider Line
-  doc.setFont('helvetica', 'normal');
+  doc.setFont(FONT_STYLE, 'normal');
   doc.setLineWidth(0.5);
   doc.setDrawColor(0, 0, 0); // Black border
   doc.line(15, 51, 195, 51);
+
+  // TAX INVOICE Heading
+  doc.setFontSize(14);
+  doc.setFont(FONT_STYLE, 'bold');
+  doc.setTextColor(0, 0, 0); // Black color
+  doc.text('TAX INVOICE', 105, 58, { align: 'center' });
 
   // --- Invoice Info ---
   doc.setFontSize(10);
   doc.setTextColor(0);
 
   // Left Side: Bill To
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(FONT_STYLE, 'bold');
   doc.setTextColor(41, 128, 185); // Blue color for heading
-  doc.text('Bill To:', 15, 61);
-  doc.setFont('helvetica', 'normal');
+  doc.text('Bill To:', 15, 66);
+  doc.setFont(FONT_STYLE, 'normal');
   doc.setTextColor(0, 0, 0); // Black color for content
 
-  let currentY = 67;
+  let currentY = 72;
   const lineHeight = 4;
   const labelX = 15;
   const colonX = 55; // Position where all colons align
@@ -240,17 +247,21 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   const rightColonX = 155; // Position where colons align
   const rightValueX = 158; // Position  where values start
 
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(FONT_STYLE, 'bold');
   doc.setTextColor(41, 128, 185); // Blue color for heading
-  doc.text('Invoice Details:', rightColX, 61);
-  doc.setFont('helvetica', 'normal');
+  doc.text('Invoice Details:', rightColX, 66);
+  doc.setFont(FONT_STYLE, 'normal');
   doc.setTextColor(0, 0, 0); // Black color for content
 
-  let rightY = 67;
-
+  let rightY = 72;
   doc.text('Bill No', rightColX, rightY);
   doc.text(':', rightColonX, rightY);
   doc.text(billNo, rightValueX, rightY);
+  rightY += lineHeight;
+
+  doc.text('Date', rightColX, rightY);
+  doc.text(':', rightColonX, rightY);
+  doc.text(formatDate(now), rightValueX, rightY);
   rightY += lineHeight;
 
   doc.text('Vehicle No', rightColX, rightY);
@@ -274,10 +285,10 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   const tripDetailsY = Math.max(currentY + 5, rightY + 5, 85);
 
   // Trip Details heading in blue
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(FONT_STYLE, 'bold');
   doc.setTextColor(41, 128, 185); // Blue color for heading
   doc.text('Trip Details:', 15, tripDetailsY);
-  doc.setFont('helvetica', 'normal');
+  doc.setFont(FONT_STYLE, 'normal');
   doc.setTextColor(0, 0, 0);
 
   let tripY = tripDetailsY + 5;
@@ -332,11 +343,11 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
     tripY += lineHeight;
 
     // Row 5: Chargeable KM (highlighted, bold)
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(FONT_STYLE, 'bold');
     doc.text('Chargeable KM', leftColX, tripY);
     doc.text(':', leftColonX, tripY);
     doc.text(`${data.chargeableKm} km`, leftValueX, tripY);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(FONT_STYLE, 'normal');
     tripY += lineHeight;
   } else {
     tripY += lineHeight;
@@ -514,13 +525,13 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
 
   // --- Bank Details Section (Left Side) ---
   doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(FONT_STYLE, 'bold');
   doc.setTextColor(41, 128, 185); // Blue color
   doc.text('Bank Details :', 15, bankDetailsY);
   doc.setTextColor(0, 0, 0);
 
   let currentBankY = bankDetailsY + 6;
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(FONT_STYLE, 'bold');
   doc.setFontSize(8);
 
   doc.text('Name : Karur Vysya Bank', 15, currentBankY);
@@ -539,7 +550,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
 
   // CHEQUES/DD line (below UPI ID)
   doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(FONT_STYLE, 'bold');
   doc.setTextColor(0, 0, 0);
   doc.text('CHEQUES / DD Favouring "SRI GOKILAM TRAVELS" Only', 15, currentBankY);
   currentBankY += 7; // Extra space before QR
@@ -569,7 +580,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   // Scan instruction below QR (centered to QR)
   currentBankY = qrY + qrSize + 2;
   doc.setFontSize(7);
-  doc.setFont('helvetica', 'italic');
+  doc.setFont(FONT_STYLE, 'italic');
   doc.setTextColor(100);
   const qrCenterX = qrX + (qrSize / 2); // Center of QR code
   doc.text('Scan this QR code to pay', qrCenterX, currentBankY, { align: 'center' });
@@ -582,7 +593,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   let currentTotalsY = finalY;
 
   doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
+  doc.setFont(FONT_STYLE, 'normal');
 
   // Taxable Sub Total
   doc.text('Sub Total', totalsXLabel, currentTotalsY);
@@ -658,10 +669,10 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
 
   // --- Bottom Row: In Words (Left) | Grand Total (Right) ---
   const amountInWords = numberToWords(finalTotal);
-  doc.setFont('helvetica', 'italic');
+  doc.setFont(FONT_STYLE, 'italic');
   doc.setFontSize(8);
   doc.text('In words:', 15, bottomLineY + 2);
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(FONT_STYLE, 'bold');
 
   const wordsLines = doc.splitTextToSize(amountInWords, 90);
   doc.text(wordsLines, 28, bottomLineY + 2);
@@ -680,7 +691,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
 
   // Footer messages at the very bottom
   doc.setFontSize(6);
-  doc.setFont('helvetica', 'italic');
+  doc.setFont(FONT_STYLE, 'italic');
   doc.setTextColor(100);
   const pageHeight = doc.internal.pageSize.height;
   doc.text('Compute only, valid without signature. Thank you for travelling with us!', 105, pageHeight - 10, { align: 'center' });
