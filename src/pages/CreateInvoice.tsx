@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { calculateSubtotal, type AdditionalCost, type RentType } from '../lib/calculator';
 import { useDrive } from '../services/useDrive';
 import { generateInvoicePDF } from '../services/pdfGeneration';
+import { getFormattedInvoiceNumber } from '../services/firestore';
 
 export default function CreateInvoice() {
   const navigate = useNavigate();
@@ -162,8 +163,21 @@ export default function CreateInvoice() {
       }
 
 
-      // 1. Prepare Invoice Data
+      // 1. Get Next Invoice Number from Firestore
+      const loadingToast = toast.loading('Generating invoice number...');
+      let invoiceNumber: string;
+      try {
+        invoiceNumber = await getFormattedInvoiceNumber();
+        toast.success(`Invoice ${invoiceNumber} created`, { id: loadingToast });
+      } catch (error) {
+        toast.error('Failed to generate invoice number', { id: loadingToast });
+        setUploading(false);
+        return;
+      }
+
+      // 2. Prepare Invoice Data
       const invoiceData = {
+        invoiceNumber,
         customerTitle,
         customerName,
         customerCompanyName,
@@ -210,10 +224,10 @@ export default function CreateInvoice() {
         grandTotal
       };
 
-      // 2. Generate PDF Blob
+      // 3. Generate PDF Blob
       const { blob, fileName } = await generateInvoicePDF(invoiceData);
 
-      // 3. Create File object
+      // 4. Create File object
       const pdfFile = new File([blob], fileName, { type: 'application/pdf' });
 
       // 4. Upload to Google Drive

@@ -81,6 +81,7 @@ const formatDateTime = (date: Date | string): string => {
 };
 
 export interface InvoiceData {
+  invoiceNumber: string; // Formatted invoice number (e.g., "#00001")
   customerTitle: string;
   customerName: string;
   customerCompanyName: string;
@@ -132,13 +133,12 @@ export interface InvoiceData {
 export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blob; fileName: string }> => {
   const doc = new jsPDF();
 
-  // Date/Time for Bill No
+
+  // Current date for invoice date display
   const now = new Date();
-  const dateStr = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}`;
-  const timeStr = `${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
-  // Add a random 3-digit suffix for extra uniqueness
-  const randomSuffix = Math.floor(Math.random() * 900 + 100);
-  const billNo = `INV-${dateStr}-${timeStr}-${randomSuffix}`;
+
+  // Use the invoice number from Firestore (already formatted as #00001)
+  const billNo = data.invoiceNumber.replace('#', 'INV-'); // INV-00001 for filename
 
   // Sanitize customer name for filename
   const cleanCustomerName = data.customerName ? data.customerName.replace(/[^a-z0-9]/gi, '_') : 'Customer';
@@ -254,9 +254,9 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   doc.setTextColor(0, 0, 0); // Black color for content
 
   let rightY = 72;
-  doc.text('Bill No', rightColX, rightY);
+  doc.text('Invoice No', rightColX, rightY);
   doc.text(':', rightColonX, rightY);
-  doc.text(billNo, rightValueX, rightY);
+  doc.text(data.invoiceNumber, rightValueX, rightY); // Display formatted number (#00001)
   rightY += lineHeight;
 
   doc.text('Date', rightColX, rightY);
