@@ -300,9 +300,13 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   const rightTripValueX = 158;
 
   // Row 1: From | Trip Start
+  const maxLocationLength = 30;
+  const truncatedFrom = (data.tripStartLocation || '-').length > maxLocationLength
+    ? (data.tripStartLocation || '-').substring(0, maxLocationLength) + '...'
+    : (data.tripStartLocation || '-');
   doc.text('From', leftColX, tripY);
   doc.text(':', leftColonX, tripY);
-  doc.text(data.tripStartLocation || '-', leftValueX, tripY);
+  doc.text(truncatedFrom, leftValueX, tripY);
 
   doc.text('Trip Start', rightTripColX, tripY);
   doc.text(':', rightTripColonX, tripY);
@@ -311,9 +315,12 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   tripY += lineHeight;
 
   // Row 2: To | Trip End
+  const truncatedTo = (data.tripEndLocation || '-').length > maxLocationLength
+    ? (data.tripEndLocation || '-').substring(0, maxLocationLength) + '...'
+    : (data.tripEndLocation || '-');
   doc.text('To', leftColX, tripY);
   doc.text(':', leftColonX, tripY);
-  doc.text(data.tripEndLocation || '-', leftValueX, tripY);
+  doc.text(truncatedTo, leftValueX, tripY);
 
   doc.text('Trip End', rightTripColX, tripY);
   doc.text(':', rightTripColonX, tripY);
