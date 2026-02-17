@@ -471,24 +471,13 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
     finalY = 20;
   }
 
-  // Calculate TAXABLE amount (only rent items, excluding additional costs)
+  // Calculate TAXABLE amount (only rent/vehicle items, excluding additional costs, driver beta, night halt)
   let taxableSubTotal = 0;
-  if (rentAmount > 0) {
-    taxableSubTotal += rentAmount;
-  }
-  // For fixed/hour/day types, the charges were already added to tableBody individually
-  // We need to sum them excluding additional costs
-  const numberOfRentItems = tableBody.length - data.additionalCosts.length;
-  for (let i = 0; i < numberOfRentItems; i++) {
-    taxableSubTotal += parseFloat(tableBody[i][1] as string);
-  }
-  // Subtract the rentAmount we already added if it was counted
-  if (rentAmount > 0) {
-    taxableSubTotal -= rentAmount;
-  }
-
-  // Actually, let's recalculate cleanly
-  taxableSubTotal = 0;
+  // Count non-taxable rows at the end of tableBody: additional costs + driver beta + night halt
+  let nonTaxableRowCount = data.additionalCosts.length;
+  if (data.enableDriverBeta) nonTaxableRowCount++;
+  if (data.enableNightHalt) nonTaxableRowCount++;
+  const numberOfRentItems = tableBody.length - nonTaxableRowCount;
   for (let i = 0; i < numberOfRentItems; i++) {
     taxableSubTotal += parseFloat(tableBody[i][1] as string);
   }
@@ -660,7 +649,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   currentTotalsY += 8;
 
   // Bottom Line Y = Max of bank block or totals block + padding
-  let bottomLineY = Math.max(currentBankY, currentTotalsY) + 7;
+  const bottomLineY = Math.max(currentBankY, currentTotalsY) + 7;
 
   // Divider line before bottom row
   doc.setLineWidth(0.5);

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, Printer, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { calculateSubtotal, type AdditionalCost, type RentType } from '../lib/calculator';
+import { type AdditionalCost, type RentType } from '../lib/calculator';
 import { useDrive } from '../services/useDrive';
 import { generateInvoicePDF } from '../services/pdfGeneration';
 import { getFormattedInvoiceNumber } from '../services/firestore';
@@ -89,30 +89,32 @@ export default function CreateInvoice() {
   const driverBetaTotal = enableDriverBeta ? driverBetaDays * driverBetaAmountPerDay : 0;
   const nightHaltTotal = enableNightHalt ? nightHaltDays * nightHaltAmountPerDay : 0;
 
-  // Base subtotal (rent + additional costs)
-  const baseSubtotal = calculateSubtotal(rentTotal, additionalCosts);
+  // Non-taxable total (additional costs + driver beta + night halt)
+  const additionalCostsTotal = additionalCosts.reduce((sum, item) => sum + item.amount, 0);
+  const nonTaxableTotal = additionalCostsTotal + driverBetaTotal + nightHaltTotal;
 
-  // Add Driver Beta and Night Halt to get full subtotal
-  const subtotal = baseSubtotal + driverBetaTotal + nightHaltTotal;
+  // Full subtotal for display (rent + all other costs)
+  const subtotal = rentTotal + nonTaxableTotal;
 
-  // Calculate GST or IGST (mutually exclusive)
+  // Calculate GST or IGST on VEHICLE RENT ONLY (mutually exclusive)
   let gstAmount = 0;
   let igstAmount = 0;
-  let grandTotal = subtotal;
+  let taxableAmount = rentTotal;
 
-  // Apply discount first
+  // Apply discount to taxable amount first
   if (enableDiscount) {
-    grandTotal -= discountAmount;
+    taxableAmount = Math.max(0, taxableAmount - discountAmount);
   }
 
-  // Apply GST or IGST
+  // Apply GST or IGST only on vehicle rent
   if (enableGst) {
-    gstAmount = grandTotal * (gstPercentage / 100);
-    grandTotal += gstAmount;
+    gstAmount = taxableAmount * (gstPercentage / 100);
   } else if (enableIgst) {
-    igstAmount = grandTotal * (igstPercentage / 100);
-    grandTotal += igstAmount;
+    igstAmount = taxableAmount * (igstPercentage / 100);
   }
+
+  // Grand total = taxable amount + GST/IGST + non-taxable
+  const grandTotal = taxableAmount + gstAmount + igstAmount + nonTaxableTotal;
 
   const addCost = () => {
     if (!newCostLabel || !newCostAmount) return;
@@ -171,6 +173,7 @@ export default function CreateInvoice() {
         toast.success(`Invoice ${invoiceNumber} created`, { id: loadingToast });
       } catch (error) {
         toast.error('Failed to generate invoice number', { id: loadingToast });
+        console.log(error);
         setUploading(false);
         return;
       }
