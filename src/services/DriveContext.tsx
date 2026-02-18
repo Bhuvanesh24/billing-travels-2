@@ -11,6 +11,7 @@ interface DriveContextType {
   signIn: () => Promise<void>;
   signOut: () => void;
   uploadFile: (file: File, customName?: string) => Promise<UploadResult>;
+  deleteFile: (fileId: string) => Promise<void>;
   listPDFs: (pageSize?: number, pageToken?: string, searchQuery?: string) => Promise<{ files: DriveFile[], nextPageToken?: string }>;
   loading: boolean;
   error: string | null;
@@ -76,6 +77,16 @@ export function DriveProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const deleteFile = async (fileId: string) => {
+    try {
+      setError(null);
+      await driveService.deleteFile(fileId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete file');
+      throw err;
+    }
+  };
+
   const listPDFs = async (pageSize?: number, pageToken?: string, searchQuery?: string) => {
     try {
       setError(null);
@@ -95,6 +106,7 @@ export function DriveProvider({ children }: { children: ReactNode }) {
         signIn,
         signOut,
         uploadFile,
+        deleteFile,
         listPDFs,
         loading,
         error,

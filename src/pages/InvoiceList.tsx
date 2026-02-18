@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FileText, Plus, Loader2, LogIn, Search } from 'lucide-react';
+import { FileText, Plus, Loader2, LogIn, Search, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useDrive } from '../services/useDrive';
 import type { DriveFile } from '../services/google-drive-service';
 
 export default function InvoiceList() {
-  const { isSignedIn, signIn, listPDFs, isInitialized } = useDrive();
+  const { isSignedIn, signIn, listPDFs, deleteFile, isInitialized } = useDrive();
   const [invoices, setInvoices] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [nextPageToken, setNextPageToken] = useState<string | undefined>(undefined);
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isInitialized) return;
@@ -63,6 +65,23 @@ export default function InvoiceList() {
     // Reset list and load with new search term
     setNextPageToken(undefined);
     loadData(undefined, searchTerm);
+  };
+
+  const handleDelete = async (file: DriveFile) => {
+    const confirmed = window.confirm(`Are you sure you want to delete "${file.name}"?\n\nThis will permanently remove it from Google Drive.`);
+    if (!confirmed) return;
+
+    try {
+      setDeletingId(file.id);
+      await deleteFile(file.id);
+      setInvoices(prev => prev.filter(inv => inv.id !== file.id));
+      toast.success(`"${file.name}" deleted successfully`);
+    } catch (error) {
+      console.error('Failed to delete invoice:', error);
+      toast.error('Failed to delete invoice. Please try again.');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   if (!isInitialized) {
@@ -208,6 +227,18 @@ export default function InvoiceList() {
                         >
                           View
                         </a>
+                        <button
+                          onClick={() => handleDelete(file)}
+                          disabled={deletingId === file.id}
+                          className="px-3 py-2 text-sm font-medium text-red-500 bg-red-50 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                        >
+                          {deletingId === file.id ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={16} />
+                          )}
+                          Delete
+                        </button>
                       </div>
                     </div>
                   ))

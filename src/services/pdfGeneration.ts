@@ -299,6 +299,9 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   const rightTripColonX = 155;
   const rightTripValueX = 158;
 
+  // Max width for From/To values so they don't overlap with the right column
+  const locationMaxWidth = 68; // leaves gap before rightTripColX (130)
+
   // Row 1: From | Trip Start
   const maxLocationLength = 30;
   const truncatedFrom = (data.tripStartLocation || '-').length > maxLocationLength
@@ -306,13 +309,14 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
     : (data.tripStartLocation || '-');
   doc.text('From', leftColX, tripY);
   doc.text(':', leftColonX, tripY);
-  doc.text(truncatedFrom, leftValueX, tripY);
+  const fromLines = doc.splitTextToSize(data.tripStartLocation || '-', locationMaxWidth);
+  doc.text(fromLines, leftValueX, tripY);
 
   doc.text('Trip Start', rightTripColX, tripY);
   doc.text(':', rightTripColonX, tripY);
   const startTimeText = data.startTime ? formatDateTime(data.startTime) : '-';
   doc.text(startTimeText, rightTripValueX, tripY);
-  tripY += lineHeight;
+  tripY += lineHeight * fromLines.length;
 
   // Row 2: To | Trip End
   const truncatedTo = (data.tripEndLocation || '-').length > maxLocationLength
@@ -320,13 +324,14 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
     : (data.tripEndLocation || '-');
   doc.text('To', leftColX, tripY);
   doc.text(':', leftColonX, tripY);
-  doc.text(truncatedTo, leftValueX, tripY);
+  const toLines = doc.splitTextToSize(data.tripEndLocation || '-', locationMaxWidth);
+  doc.text(toLines, leftValueX, tripY);
 
   doc.text('Trip End', rightTripColX, tripY);
   doc.text(':', rightTripColonX, tripY);
   const endTimeText = data.endTime ? formatDateTime(data.endTime) : '-';
   doc.text(endTimeText, rightTripValueX, tripY);
-  tripY += lineHeight;
+  tripY += lineHeight * toLines.length;
 
   // Row 3: Start KM | End KM
   doc.text('Start KM', leftColX, tripY);

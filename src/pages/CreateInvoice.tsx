@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Printer, Loader2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Printer, Loader2, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { type AdditionalCost, type RentType } from '../lib/calculator';
 import { useDrive } from '../services/useDrive';
@@ -128,6 +128,87 @@ export default function CreateInvoice() {
 
   const removeCost = (id: string) => {
     setAdditionalCosts(additionalCosts.filter(c => c.id !== id));
+  };
+
+  const handlePreviewInvoice = async () => {
+    // Same validation as generate
+    if (!customerName.trim()) {
+      toast.error('Please enter customer name');
+      return;
+    }
+    if (startKm < 0 || endKm < 0) {
+      toast.error('KM readings cannot be negative');
+      return;
+    }
+    if (endKm < startKm) {
+      toast.error('End KM cannot be less than Start KM');
+      return;
+    }
+    if (startTime && endTime) {
+      if (new Date(endTime) < new Date(startTime)) {
+        toast.error('End Time cannot be before Start Time');
+        return;
+      }
+    }
+
+    try {
+      const invoiceData = {
+        invoiceNumber: '#PREVIEW',
+        customerTitle,
+        customerName,
+        customerCompanyName,
+        customerAddress,
+        customerGstNo,
+        driverName,
+        vehicleNo,
+        vehicleType,
+        tripStartLocation,
+        tripEndLocation,
+        startKm,
+        endKm,
+        startTime,
+        endTime,
+        rentType,
+        fixedAmount,
+        hours,
+        ratePerHour,
+        days,
+        ratePerDay,
+        fuelChargePerKm,
+        totalKm,
+        freeKm,
+        chargeableKm,
+        ratePerKm,
+        chargePerKmFixed,
+        chargePerKmHour,
+        additionalCosts,
+        enableDriverBeta,
+        driverBetaDays,
+        driverBetaAmountPerDay,
+        enableNightHalt,
+        nightHaltDays,
+        nightHaltAmountPerDay,
+        enableDiscount,
+        discountAmount,
+        enableGst,
+        gstPercentage,
+        gstAmount,
+        enableIgst,
+        igstPercentage,
+        igstAmount,
+        advance,
+        grandTotal
+      };
+
+      const { blob } = await generateInvoicePDF(invoiceData);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      // Clean up object URL after a delay so the tab can load it
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (error) {
+      console.error('Preview error:', error);
+      toast.error('Failed to generate preview');
+    }
   };
 
   const handleGenerateInvoice = async () => {
@@ -872,6 +953,15 @@ export default function CreateInvoice() {
                   <span>₹{(grandTotal - advance).toFixed(2)}</span>
                 </div>
               </div>
+
+              <button
+                onClick={handlePreviewInvoice}
+                disabled={uploading || driveLoading}
+                className="w-full bg-slate-700 hover:bg-slate-600 disabled:bg-slate-500 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition-colors mb-3"
+              >
+                <Eye size={20} />
+                Preview Invoice
+              </button>
 
               <button
                 onClick={handleGenerateInvoice}
