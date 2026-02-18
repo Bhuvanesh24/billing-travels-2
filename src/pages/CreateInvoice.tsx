@@ -840,7 +840,7 @@ export default function CreateInvoice() {
                   <div className={`w-10 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer transition-colors ${enableNightHalt ? 'bg-blue-600' : ''}`} onClick={() => setEnableNightHalt(!enableNightHalt)}>
                     <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${enableNightHalt ? 'translate-x-4' : ''}`}></div>
                   </div>
-                  <span className="text-sm font-medium text-slate-700">Night Halt</span>
+                  <span className="text-sm font-medium text-slate-700">Outstation Driver Charge</span>
                 </div>
                 {enableNightHalt && (
                   <div className="flex gap-2">

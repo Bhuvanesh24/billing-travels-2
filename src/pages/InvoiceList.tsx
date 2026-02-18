@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FileText, Plus, Loader2, LogIn, Search, Trash2 } from 'lucide-react';
+import { FileText, Plus, Loader2, LogIn, Search, Trash2, LogOut } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useDrive } from '../services/useDrive';
+import { useAuth } from '../services/AuthContext';
 import type { DriveFile } from '../services/google-drive-service';
 
 export default function InvoiceList() {
   const { isSignedIn, signIn, listPDFs, deleteFile, isInitialized } = useDrive();
+  const { logout } = useAuth();
   const [invoices, setInvoices] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [nextPageToken, setNextPageToken] = useState<string | undefined>(undefined);
@@ -169,6 +171,15 @@ export default function InvoiceList() {
               <Plus size={20} />
               New Invoice
             </Link>
+
+            <button
+              onClick={logout}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors shadow-sm whitespace-nowrap border border-slate-300 text-slate-600 bg-white hover:bg-slate-100"
+              title="Logout"
+            >
+              <LogOut size={20} />
+              Logout
+            </button>
           </div>
         </div>
 

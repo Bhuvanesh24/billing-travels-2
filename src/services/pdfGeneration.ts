@@ -440,7 +440,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   // 4. Night Halt (NON-TAXABLE)
   if (data.enableNightHalt) {
     const nightHaltTotal = data.nightHaltDays * data.nightHaltAmountPerDay;
-    tableBody.push([`Night Halt (${data.nightHaltDays} days @ Rs${data.nightHaltAmountPerDay}/day)`, nightHaltTotal.toFixed(2)]);
+    tableBody.push([`Outstation Driver Charge (${data.nightHaltDays} days @ Rs${data.nightHaltAmountPerDay}/day)`, nightHaltTotal.toFixed(2)]);
   }
 
   autoTable(doc, {
