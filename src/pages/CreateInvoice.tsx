@@ -7,6 +7,115 @@ import { useDrive } from '../services/useDrive';
 import { generateInvoicePDF } from '../services/pdfGeneration';
 import { getFormattedInvoiceNumber } from '../services/firestore';
 
+interface DateTimeInputProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+const DateTimeInput = ({ label, value, onChange }: DateTimeInputProps) => {
+  const parseValue = (val: string) => {
+    if (!val) return { date: '', hours: '', minutes: '', period: 'AM' as const };
+    const [d, t] = val.split('T');
+    if (!t) return { date: d, hours: '', minutes: '', period: 'AM' as const };
+
+    const [h, m] = t.split(':');
+    let hourInt = parseInt(h);
+    const period = hourInt >= 12 ? 'PM' : 'AM';
+
+    if (hourInt > 12) hourInt -= 12;
+    if (hourInt === 0) hourInt = 12;
+
+    return { date: d, hours: hourInt.toString(), minutes: m, period };
+  };
+
+  const { date, hours, minutes, period } = parseValue(value);
+
+  const update = (newDate: string, newHours: string, newMinutes: string, newPeriod: string) => {
+    if (!newDate) {
+      onChange('');
+      return;
+    }
+
+    let h = parseInt(newHours || '0');
+    if (isNaN(h)) h = 0;
+
+    let m = parseInt(newMinutes || '0');
+    if (isNaN(m)) m = 0;
+
+    let p = newPeriod;
+
+    if (p === 'PM' && h < 12) h += 12;
+    if (p === 'AM' && h === 12) h = 0;
+
+    const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+    onChange(`${newDate}T${timeStr}`);
+  };
+
+  const handleBlur = (field: 'hours' | 'minutes', valStr: string) => {
+    let val = parseInt(valStr || '0');
+    if (isNaN(val)) val = 0;
+
+    if (field === 'hours') {
+      if (val < 1) val = 1;
+      if (val > 12) val = 12;
+      update(date, val.toString(), minutes, period);
+    } else {
+      if (val < 0) val = 0;
+      if (val > 59) val = 59;
+      update(date, hours, val.toString(), period);
+    }
+  };
+
+  return (
+    <div>
+      <label className="block text-xs text-slate-500 mb-1">{label}</label>
+      <div className="flex flex-col gap-2">
+        <input
+          type="date"
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          value={date}
+          onClick={(e) => (e.target as HTMLInputElement).showPicker()}
+          onChange={(e) => update(e.target.value, hours || '12', minutes || '00', period)}
+        />
+        <div className="flex items-center gap-2">
+          <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden flex-1 bg-white focus-within:ring-2 focus-within:ring-blue-500 ring-offset-0">
+            <input
+              type="number"
+              className="w-full px-2 py-2 text-center text-sm outline-none appearance-none"
+              placeholder="HH"
+              min="1"
+              max="12"
+              value={hours}
+              onChange={(e) => update(date, e.target.value, minutes, period)}
+              onBlur={(e) => handleBlur('hours', e.target.value)}
+            />
+            <span className="text-slate-400 font-bold">:</span>
+            <input
+              type="number"
+              className="w-full px-2 py-2 text-center text-sm outline-none appearance-none"
+              placeholder="MM"
+              min="0"
+              max="59"
+              value={minutes}
+              onChange={(e) => update(date, hours, e.target.value, period)}
+              onBlur={(e) => handleBlur('minutes', e.target.value)}
+            />
+          </div>
+          <select
+            className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50 font-medium outline-none focus:ring-2 focus:ring-blue-500"
+            value={period}
+            onChange={(e) => update(date, hours, minutes, e.target.value as 'AM' | 'PM')}
+          >
+            <option value="AM">AM</option>
+            <option value="PM">PM</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function CreateInvoice() {
   const navigate = useNavigate();
   const { isSignedIn, signIn, uploadFile, loading: driveLoading } = useDrive();
@@ -484,24 +593,16 @@ export default function CreateInvoice() {
                     onChange={e => setEndKm(Number(e.target.value))}
                   />
                 </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Start Time</label>
-                  <input
-                    type="datetime-local"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                    value={startTime}
-                    onChange={e => setStartTime(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">End Time</label>
-                  <input
-                    type="datetime-local"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                    value={endTime}
-                    onChange={e => setEndTime(e.target.value)}
-                  />
-                </div>
+                <DateTimeInput
+                  label="Start Time"
+                  value={startTime}
+                  onChange={setStartTime}
+                />
+                <DateTimeInput
+                  label="End Time"
+                  value={endTime}
+                  onChange={setEndTime}
+                />
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Free KM</label>
                   <input

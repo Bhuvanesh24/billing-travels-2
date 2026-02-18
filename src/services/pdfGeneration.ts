@@ -303,10 +303,9 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   const locationMaxWidth = 68; // leaves gap before rightTripColX (130)
 
   // Row 1: From | Trip Start
-  const maxLocationLength = 30;
-  const truncatedFrom = (data.tripStartLocation || '-').length > maxLocationLength
-    ? (data.tripStartLocation || '-').substring(0, maxLocationLength) + '...'
-    : (data.tripStartLocation || '-');
+  // const truncatedFrom = (data.tripStartLocation || '-').length > maxLocationLength
+  //   ? (data.tripStartLocation || '-').substring(0, maxLocationLength) + '...'
+  //   : (data.tripStartLocation || '-');
   doc.text('From', leftColX, tripY);
   doc.text(':', leftColonX, tripY);
   const fromLines = doc.splitTextToSize(data.tripStartLocation || '-', locationMaxWidth);
@@ -319,9 +318,9 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   tripY += lineHeight * fromLines.length;
 
   // Row 2: To | Trip End
-  const truncatedTo = (data.tripEndLocation || '-').length > maxLocationLength
-    ? (data.tripEndLocation || '-').substring(0, maxLocationLength) + '...'
-    : (data.tripEndLocation || '-');
+  // const truncatedTo = (data.tripEndLocation || '-').length > maxLocationLength
+  //   ? (data.tripEndLocation || '-').substring(0, maxLocationLength) + '...'
+  //   : (data.tripEndLocation || '-');
   doc.text('To', leftColX, tripY);
   doc.text(':', leftColonX, tripY);
   const toLines = doc.splitTextToSize(data.tripEndLocation || '-', locationMaxWidth);
