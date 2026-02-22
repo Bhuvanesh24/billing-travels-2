@@ -220,8 +220,9 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   if (data.customerCompanyName) {
     doc.text('Company', labelX, currentY);
     doc.text(':', colonX, currentY);
-    doc.text(data.customerCompanyName, valueX, currentY);
-    currentY += lineHeight;
+    const companyLines = doc.splitTextToSize(data.customerCompanyName, 70);
+    doc.text(companyLines, valueX, currentY);
+    currentY += lineHeight * companyLines.length;
   }
 
   if (data.customerAddress) {
