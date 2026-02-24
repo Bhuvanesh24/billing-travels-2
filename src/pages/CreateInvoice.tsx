@@ -81,22 +81,20 @@ const DateTimeInput = ({ label, value, onChange }: DateTimeInputProps) => {
         <div className="flex items-center gap-2">
           <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden flex-1 bg-white focus-within:ring-2 focus-within:ring-blue-500 ring-offset-0">
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               className="w-full px-2 py-2 text-center text-sm outline-none appearance-none"
               placeholder="HH"
-              min="1"
-              max="12"
               value={hours}
               onChange={(e) => update(date, e.target.value, minutes, period)}
               onBlur={(e) => handleBlur('hours', e.target.value)}
             />
             <span className="text-slate-400 font-bold">:</span>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               className="w-full px-2 py-2 text-center text-sm outline-none appearance-none"
               placeholder="MM"
-              min="0"
-              max="59"
               value={minutes}
               onChange={(e) => update(date, hours, e.target.value, period)}
               onBlur={(e) => handleBlur('minutes', e.target.value)}
@@ -578,7 +576,8 @@ export default function CreateInvoice() {
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Start KM</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
                     value={startKm || ''}
                     onChange={e => setStartKm(Number(e.target.value))}
@@ -587,7 +586,8 @@ export default function CreateInvoice() {
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">End KM</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
                     value={endKm || ''}
                     onChange={e => setEndKm(Number(e.target.value))}
@@ -606,7 +606,8 @@ export default function CreateInvoice() {
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Free KM</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
                     placeholder="e.g. 50"
                     value={freeKm || ''}
@@ -660,7 +661,8 @@ export default function CreateInvoice() {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Total Fixed Amount (₹)</label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-lg font-medium"
                       placeholder="0.00"
                       value={fixedAmount || ''}
@@ -670,7 +672,8 @@ export default function CreateInvoice() {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Charge per KM (₹)</label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                       placeholder="0.00"
                       value={chargePerKmFixed || ''}
@@ -680,7 +683,7 @@ export default function CreateInvoice() {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Chargeable KM</label>
                     <input
-                      type="number"
+                      type="text"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-100"
                       value={chargeableKm}
                       disabled
@@ -694,7 +697,8 @@ export default function CreateInvoice() {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Total Hours</label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                       placeholder="e.g. 8"
                       value={hours || ''}
@@ -704,7 +708,8 @@ export default function CreateInvoice() {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Rate per Hour (₹)</label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                       placeholder="0.00"
                       value={ratePerHour || ''}
@@ -714,7 +719,8 @@ export default function CreateInvoice() {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Charge per KM (₹)</label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                       placeholder="0.00"
                       value={chargePerKmHour || ''}
@@ -724,7 +730,7 @@ export default function CreateInvoice() {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Chargeable KM</label>
                     <input
-                      type="number"
+                      type="text"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-100"
                       value={chargeableKm}
                       disabled
@@ -739,7 +745,8 @@ export default function CreateInvoice() {
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">No of Days</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                         placeholder="e.g. 3"
                         value={days || ''}
@@ -749,7 +756,8 @@ export default function CreateInvoice() {
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Amount per Day (₹)</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                         placeholder="0.00"
                         value={ratePerDay || ''}
@@ -761,7 +769,7 @@ export default function CreateInvoice() {
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Chargeable KM</label>
                       <input
-                        type="number"
+                        type="text"
                         className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-100"
                         value={chargeableKm}
                         disabled
@@ -770,7 +778,8 @@ export default function CreateInvoice() {
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Fuel Charge per KM (₹)</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                         placeholder="0.00"
                         value={fuelChargePerKm || ''}
@@ -786,7 +795,7 @@ export default function CreateInvoice() {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Chargeable KM</label>
                     <input
-                      type="number"
+                      type="text"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-100"
                       value={chargeableKm}
                       disabled
@@ -795,7 +804,8 @@ export default function CreateInvoice() {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Amount per KM (₹)</label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                       placeholder="0.00"
                       value={ratePerKm || ''}
@@ -818,14 +828,16 @@ export default function CreateInvoice() {
                 {enableDriverBeta && (
                   <div className="flex gap-2">
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       placeholder="Days"
                       className="w-20 px-3 py-1 border border-slate-300 rounded-lg text-sm"
                       value={driverBetaDays || ''}
                       onChange={e => setDriverBetaDays(Number(e.target.value))}
                     />
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       placeholder="₹/day"
                       className="w-24 px-3 py-1 border border-slate-300 rounded-lg text-sm"
                       value={driverBetaAmountPerDay || ''}
@@ -845,14 +857,16 @@ export default function CreateInvoice() {
                 {enableNightHalt && (
                   <div className="flex gap-2">
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       placeholder="Days"
                       className="w-20 px-3 py-1 border border-slate-300 rounded-lg text-sm"
                       value={nightHaltDays || ''}
                       onChange={e => setNightHaltDays(Number(e.target.value))}
                     />
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       placeholder="₹/day"
                       className="w-24 px-3 py-1 border border-slate-300 rounded-lg text-sm"
                       value={nightHaltAmountPerDay || ''}
@@ -876,7 +890,8 @@ export default function CreateInvoice() {
                   onChange={e => setNewCostLabel(e.target.value)}
                 />
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   placeholder="Amount"
                   className="w-32 px-3 py-2 border border-slate-300 rounded-lg text-sm"
                   value={newCostAmount}
@@ -920,7 +935,8 @@ export default function CreateInvoice() {
                 </div>
                 {enableDiscount && (
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     placeholder="Amount"
                     className="w-32 px-3 py-1 border border-slate-300 rounded-lg text-sm"
                     value={discountAmount || ''}
@@ -939,13 +955,12 @@ export default function CreateInvoice() {
                 {enableGst && (
                   <div className="flex items-center gap-2">
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       placeholder="%"
                       className="w-20 px-3 py-1 border border-slate-300 rounded-lg text-sm"
                       value={gstPercentage || ''}
                       onChange={e => setGstPercentage(Number(e.target.value))}
-                      min="0"
-                      max="100"
                     />
                     <span className="text-sm text-slate-500">%</span>
                   </div>
@@ -962,13 +977,12 @@ export default function CreateInvoice() {
                 {enableIgst && (
                   <div className="flex items-center gap-2">
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       placeholder="%"
                       className="w-20 px-3 py-1 border border-slate-300 rounded-lg text-sm"
                       value={igstPercentage || ''}
                       onChange={e => setIgstPercentage(Number(e.target.value))}
-                      min="0"
-                      max="100"
                     />
                     <span className="text-sm text-slate-500">%</span>
                   </div>
@@ -978,7 +992,8 @@ export default function CreateInvoice() {
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-slate-700">Advance Amount</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   placeholder="Amount"
                   className="w-32 px-3 py-1 border border-slate-300 rounded-lg text-sm"
                   value={advance || ''}
