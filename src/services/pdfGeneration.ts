@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import QRCode from 'qrcode';
+import signatureImg from '../assets/signature.png';
 
 // Constant VPA from user
 const UPI_VPA = '9842548549-1@okbizaxis';
@@ -163,36 +164,37 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   doc.setFontSize(9);
   doc.setFont(FONT_STYLE, 'normal');
   doc.setTextColor(0, 0, 0); // Black
-  doc.text('No.5, Sai Sruthi Complex, Ramar Kovil Street, Ram Nagar, Coimbatore - 641 009.', 105, 32, { align: 'center' });
-  doc.setFontSize(8);
+  const headerAddress = 'No.5, Sai Sruthi Complex, Ramar Kovil Street, Ram Nagar, Coimbatore - 641 009.';
+  const wrappedHeaderAddress = doc.splitTextToSize(headerAddress, 180);
+  doc.text(wrappedHeaderAddress, 105, 32, { align: 'center' });
 
-  // Phone numbers in blue and bold
+  const headerAddressHeight = (wrappedHeaderAddress.length * 4);
+  const contactY = 32 + headerAddressHeight + 2; // Added gap above contact
+
+  // Contact details in blue and bold on a single line
+  doc.setFontSize(9);
   doc.setFont(FONT_STYLE, 'bold');
   doc.setTextColor(41, 128, 185); // Blue color
-  doc.text('Cell : 98425 48549, 94436 82900, 70102 99197', 105, 37, { align: 'center' });
-
-  doc.setFont(FONT_STYLE, 'normal');
-  doc.setTextColor(0, 0, 0); // Back to black
-  doc.text('E-mail : srigokilamtravels2006@gmail.com', 105, 42, { align: 'center' });
+  doc.text('Cell : 98425 48549, 94436 82900, 70102 99197   |   E-mail : srigokilamtravels2006@gmail.com', 105, contactY, { align: 'center' });
 
   // Availability message in dark red/brown
   doc.setFontSize(8);
   doc.setFont(FONT_STYLE, 'bold');
   doc.setTextColor(139, 0, 0); // Dark red/maroon color like company name
-  doc.text('AVAILABLE IN ALL TYPES OF TOURIST CAB OPERATORS', 105, 48, { align: 'center' });
+  doc.text('AVAILABLE IN ALL TYPES OF TOURIST CAB OPERATORS', 105, contactY + 6, { align: 'center' });
   doc.setTextColor(0, 0, 0); // Reset to black
 
   // Divider Line
   doc.setFont(FONT_STYLE, 'normal');
   doc.setLineWidth(0.5);
   doc.setDrawColor(0, 0, 0); // Black border
-  doc.line(15, 51, 195, 51);
+  doc.line(15, contactY + 9, 195, contactY + 9);
 
   // TAX INVOICE Heading
   doc.setFontSize(14);
   doc.setFont(FONT_STYLE, 'bold');
   doc.setTextColor(0, 0, 0); // Black color
-  doc.text('TAX INVOICE', 105, 58, { align: 'center' });
+  doc.text('TAX INVOICE', 105, contactY + 16, { align: 'center' });
 
   // --- Invoice Info ---
   doc.setFontSize(10);
@@ -220,7 +222,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   if (data.customerCompanyName) {
     doc.text('Company', labelX, currentY);
     doc.text(':', colonX, currentY);
-    const companyLines = doc.splitTextToSize(data.customerCompanyName, 70);
+    const companyLines = doc.splitTextToSize(data.customerCompanyName, 65);
     doc.text(companyLines, valueX, currentY);
     currentY += lineHeight * companyLines.length;
   }
@@ -229,7 +231,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
     doc.text('Address', labelX, currentY);
     doc.text(':', colonX, currentY);
     // Split address into lines if too long - extend to right column boundary
-    const addressLines = doc.splitTextToSize(data.customerAddress, 70);
+    const addressLines = doc.splitTextToSize(data.customerAddress, 65);
     doc.text(addressLines, valueX, currentY);
     currentY += (lineHeight * addressLines.length);
   }
@@ -478,7 +480,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   let finalY = (doc as any).lastAutoTable.finalY + 10;
 
   // Check if we need a new page for totals
-  if (finalY > 200) {
+  if (finalY > 195) {
     doc.addPage();
     finalY = 20;
   }
@@ -554,39 +556,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   doc.setFont(FONT_STYLE, 'bold');
   doc.setTextColor(0, 0, 0);
   doc.text('CHEQUES / DD Favouring "SRI GOKILAM TRAVELS" Only', 15, currentBankY);
-  currentBankY += 7; // Extra space before QR
-
-  // --- UPI QR Code (Below CHEQUES line) ---
-  const qrSize = 30;
-  const qrX = 15; // Left-aligned with Bank Details
-  const qrY = currentBankY; // Position below CHEQUES
-
-  try {
-    // Generate UPI URI
-    const upiUri = `upi://pay?pa=${UPI_VPA}&pn=${encodeURIComponent(MERCHANT_NAME)}&am=${finalTotal.toFixed(2)}&cu=INR`;
-
-    // Generate QR Data URL
-    const qrDataUrl = await QRCode.toDataURL(upiUri, { errorCorrectionLevel: 'H' });
-
-    // Add QR Image below CHEQUES line
-    doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
-
-    // Make QR Clickable (Hyperlink)
-    doc.link(qrX, qrY, qrSize, qrSize, { url: upiUri });
-
-  } catch (err) {
-    console.error('Error generating QR code:', err);
-  }
-
-  // Scan instruction below QR (centered to QR)
-  currentBankY = qrY + qrSize + 2;
-  doc.setFontSize(7);
-  doc.setFont(FONT_STYLE, 'italic');
-  doc.setTextColor(100);
-  const qrCenterX = qrX + (qrSize / 2); // Center of QR code
-  doc.text('Scan this QR code to pay', qrCenterX, currentBankY, { align: 'center' });
-  currentBankY += 5;
-
+  currentBankY += 7;
 
   // --- Totals Section (Right Side) ---
   const totalsXLabel = 115;
@@ -595,6 +565,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
 
   doc.setFontSize(9);
   doc.setFont(FONT_STYLE, 'normal');
+  doc.setTextColor(0, 0, 0); // Black (reset from grey QR instructions)
 
   // Taxable Sub Total
   doc.text('Sub Total', totalsXLabel, currentTotalsY);
@@ -658,44 +629,98 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   // Round Off
   doc.text('Round Off', totalsXLabel, currentTotalsY);
   doc.text(roundOff.toFixed(2), totalsXValue, currentTotalsY, { align: 'right' });
-  currentTotalsY += 8;
+  currentTotalsY += 4;
 
   // Bottom Line Y = Max of bank block or totals block + padding
-  const bottomLineY = Math.max(currentBankY, currentTotalsY) + 7;
+  const bottomLineY = Math.max(currentBankY, currentTotalsY) + 3;
 
   // Divider line before bottom row
   doc.setLineWidth(0.5);
   doc.setDrawColor(0, 0, 0);
-  doc.line(15, bottomLineY - 3, 195, bottomLineY - 3);
+  doc.line(15, bottomLineY - 2, 195, bottomLineY - 2);
 
   // --- Bottom Row: In Words (Left) | Grand Total (Right) ---
   const amountInWords = numberToWords(finalTotal);
   doc.setFont(FONT_STYLE, 'italic');
   doc.setFontSize(8);
-  doc.text('In words:', 15, bottomLineY + 2);
+  doc.text('In words:', 15, bottomLineY + 3);
   doc.setFont(FONT_STYLE, 'bold');
 
   const wordsLines = doc.splitTextToSize(amountInWords, 90);
-  doc.text(wordsLines, 28, bottomLineY + 2);
+  doc.text(wordsLines, 28, bottomLineY + 3);
 
   // GRAND TOTAL (Right side)
   doc.setFontSize(12);
-  doc.text('GRAND TOTAL', totalsXLabel, bottomLineY + 2);
-  doc.text(`Rs. ${finalTotal.toFixed(2)}`, totalsXValue, bottomLineY + 2, { align: 'right' });
+  doc.text('GRAND TOTAL', totalsXLabel, bottomLineY + 3);
+  doc.text(`Rs. ${finalTotal.toFixed(2)}`, totalsXValue, bottomLineY + 3, { align: 'right' });
 
-  finalY = bottomLineY + 8 + (wordsLines.length * 4);
+  finalY = bottomLineY + 5 + (wordsLines.length * 4);
 
   // Divider line after bottom row (closer spacing)
   doc.setLineWidth(0.5);
-  doc.line(15, finalY - 7, 195, finalY - 7);
+  doc.line(15, finalY - 4, 195, finalY - 4);
 
+  // --- QR Code & Signature Section ---
+  const bottomSectionY = finalY + 2;
+
+  // QR Code (Left)
+  const qrSize = 25;
+  const qrX = 15;
+  const qrY = bottomSectionY;
+
+  try {
+    // Generate UPI URI
+    const upiUri = `upi://pay?pa=${UPI_VPA}&pn=${encodeURIComponent(MERCHANT_NAME)}&am=${finalTotal.toFixed(2)}&cu=INR`;
+    // Generate QR Data URL
+    const qrDataUrl = await QRCode.toDataURL(upiUri, { errorCorrectionLevel: 'H' });
+    // Add QR Image
+    doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+    // Make QR Clickable (Hyperlink)
+    doc.link(qrX, qrY, qrSize, qrSize, { url: upiUri });
+
+    // Scan instruction
+    doc.setFontSize(7);
+    doc.setFont(FONT_STYLE, 'italic');
+    doc.setTextColor(100);
+    const qrCenterX = qrX + (qrSize / 2);
+    doc.text('Scan to pay', qrCenterX, qrY + qrSize + 3, { align: 'center' });
+  } catch (err) {
+    console.error('Error generating QR code:', err);
+  }
+
+  // Signature (Right)
+  doc.setFontSize(10);
+  doc.setFont(FONT_STYLE, 'bold');
+  doc.setTextColor(41, 128, 185); // Blue color for signature text
+  doc.text('For SRI GOKILAM TRAVELS', 190, bottomSectionY + 4, { align: 'right' });
+  try {
+    const sigRes = await fetch(signatureImg);
+    if (sigRes.ok) {
+      const sigBlob = await sigRes.blob();
+      const sigBase64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(sigBlob);
+      });
+      const sigW = 40;
+      const sigH = 15;
+      // Explicitly specifying 'PNG' helps jsPDF render transparent alpha channels properly
+      doc.addImage(sigBase64, 'PNG', 190 - sigW, bottomSectionY + 6, sigW, sigH);
+    }
+  } catch (err) {
+    console.warn('Signature image could not be loaded:', err);
+  }
+
+  // Space for signature (aligns vertically with bottom of QR)
+  doc.text('Proprietor', 190, bottomSectionY + qrSize + 2, { align: 'right' });
+  doc.setTextColor(0, 0, 0); // Reset to black
 
   // Footer messages at the very bottom
-  doc.setFontSize(6);
-  doc.setFont(FONT_STYLE, 'italic');
-  doc.setTextColor(100);
+  doc.setFontSize(9);
+  doc.setFont(FONT_STYLE, 'bold');
+  doc.setTextColor(0, 0, 0); // Black
   const pageHeight = doc.internal.pageSize.height;
-  doc.text('Compute only, valid without signature. Thank you for travelling with us!', 105, pageHeight - 10, { align: 'center' });
+  doc.text('Computer Generated Invoice, Original for Receipt, Valid without Seal, Thank you for travelling with us!', 105, pageHeight - 5, { align: 'center' });
 
   return { blob: doc.output('blob'), fileName };
 };

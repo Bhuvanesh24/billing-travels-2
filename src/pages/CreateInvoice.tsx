@@ -15,14 +15,13 @@ interface DateTimeInputProps {
 
 const DateTimeInput = ({ label, value, onChange }: DateTimeInputProps) => {
   const parseValue = (val: string) => {
-    if (!val) return { date: '', hours: '', minutes: '', period: 'AM' as const };
+    if (!val) return { date: '', hours: '12', minutes: '00', period: 'AM' as const };
     const [d, t] = val.split('T');
-    if (!t) return { date: d, hours: '', minutes: '', period: 'AM' as const };
+    if (!t) return { date: d, hours: '12', minutes: '00', period: 'AM' as const };
 
     const [h, m] = t.split(':');
     let hourInt = parseInt(h);
     const period = hourInt >= 12 ? 'PM' : 'AM';
-
     if (hourInt > 12) hourInt -= 12;
     if (hourInt === 0) hourInt = 12;
 
@@ -32,83 +31,57 @@ const DateTimeInput = ({ label, value, onChange }: DateTimeInputProps) => {
   const { date, hours, minutes, period } = parseValue(value);
 
   const update = (newDate: string, newHours: string, newMinutes: string, newPeriod: string) => {
-    if (!newDate) {
-      onChange('');
-      return;
-    }
-
-    let h = parseInt(newHours || '0');
-    if (isNaN(h)) h = 0;
-
+    if (!newDate) { onChange(''); return; }
+    let h = parseInt(newHours || '12');
     let m = parseInt(newMinutes || '0');
-    if (isNaN(m)) m = 0;
-
-    let p = newPeriod;
-
-    if (p === 'PM' && h < 12) h += 12;
-    if (p === 'AM' && h === 12) h = 0;
-
-    const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-    onChange(`${newDate}T${timeStr}`);
+    if (newPeriod === 'PM' && h < 12) h += 12;
+    if (newPeriod === 'AM' && h === 12) h = 0;
+    onChange(`${newDate}T${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
   };
 
-  const handleBlur = (field: 'hours' | 'minutes', valStr: string) => {
-    let val = parseInt(valStr || '0');
-    if (isNaN(val)) val = 0;
+  const hourOptions = Array.from({ length: 12 }, (_, i) => i + 1); // 1–12
+  const minuteOptions = Array.from({ length: 60 }, (_, i) => i);   // 0–59
 
-    if (field === 'hours') {
-      if (val < 1) val = 1;
-      if (val > 12) val = 12;
-      update(date, val.toString(), minutes, period);
-    } else {
-      if (val < 0) val = 0;
-      if (val > 59) val = 59;
-      update(date, hours, val.toString(), period);
-    }
-  };
+  const selectCls = 'px-2 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500';
 
   return (
     <div>
       <label className="block text-xs text-slate-500 mb-1">{label}</label>
-      <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-1 flex-nowrap overflow-x-auto">
         <input
           type="date"
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 min-w-0 px-2 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
           value={date}
           onClick={(e) => (e.target as HTMLInputElement).showPicker()}
-          onChange={(e) => update(e.target.value, hours || '12', minutes || '00', period)}
+          onChange={(e) => update(e.target.value, hours, minutes, period)}
         />
-        <div className="flex items-center gap-2">
-          <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden flex-1 bg-white focus-within:ring-2 focus-within:ring-blue-500 ring-offset-0">
-            <input
-              type="text"
-              inputMode="numeric"
-              className="w-full px-2 py-2 text-center text-sm outline-none appearance-none"
-              placeholder="HH"
-              value={hours}
-              onChange={(e) => update(date, e.target.value, minutes, period)}
-              onBlur={(e) => handleBlur('hours', e.target.value)}
-            />
-            <span className="text-slate-400 font-bold">:</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              className="w-full px-2 py-2 text-center text-sm outline-none appearance-none"
-              placeholder="MM"
-              value={minutes}
-              onChange={(e) => update(date, hours, e.target.value, period)}
-              onBlur={(e) => handleBlur('minutes', e.target.value)}
-            />
-          </div>
-          <select
-            className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50 font-medium outline-none focus:ring-2 focus:ring-blue-500"
-            value={period}
-            onChange={(e) => update(date, hours, minutes, e.target.value as 'AM' | 'PM')}
-          >
-            <option value="AM">AM</option>
-            <option value="PM">PM</option>
-          </select>
-        </div>
+        <select
+          className={selectCls}
+          value={hours}
+          onChange={(e) => update(date || new Date().toISOString().split('T')[0], e.target.value, minutes, period)}
+        >
+          {hourOptions.map(h => (
+            <option key={h} value={h.toString()}>{h.toString().padStart(2, '0')}</option>
+          ))}
+        </select>
+        <span className="text-slate-400 font-bold text-sm">:</span>
+        <select
+          className={selectCls}
+          value={parseInt(minutes).toString()}
+          onChange={(e) => update(date || new Date().toISOString().split('T')[0], hours, e.target.value, period)}
+        >
+          {minuteOptions.map(m => (
+            <option key={m} value={m.toString()}>{m.toString().padStart(2, '0')}</option>
+          ))}
+        </select>
+        <select
+          className={selectCls}
+          value={period}
+          onChange={(e) => update(date || new Date().toISOString().split('T')[0], hours, minutes, e.target.value as 'AM' | 'PM')}
+        >
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
       </div>
     </div>
   );
@@ -443,32 +416,32 @@ export default function CreateInvoice() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-8">
+    <div className="min-h-screen bg-slate-50 p-3 sm:p-6">
       <div className="max-w-4xl mx-auto">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-wrap items-center gap-3">
           <Link
             to="/"
-            className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors"
+            className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm"
           >
-            <ArrowLeft size={20} />
-            Back to Invoices
+            <ArrowLeft size={18} />
+            Back
           </Link>
-          <h1 className="text-2xl font-bold text-slate-900">Create New Invoice</h1>
+          <h1 className="text-xl font-bold text-slate-900">Create New Invoice</h1>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Form Area */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-5">
 
             {/* 1. Trip Details */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <div className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm">
               <h2 className="text-lg font-semibold mb-4 text-slate-800">Customer & Trip Details</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-slate-700 mb-1">Customer Name</label>
                   <div className="flex gap-2">
                     <select
-                      className="w-24 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                      className="w-24 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
                       value={customerTitle}
                       onChange={e => setCustomerTitle(e.target.value)}
                     >
@@ -480,7 +453,7 @@ export default function CreateInvoice() {
                     </select>
                     <input
                       type="text"
-                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
                       placeholder="Enter customer name"
                       value={customerName}
                       onChange={e => setCustomerName(e.target.value)}
@@ -500,7 +473,7 @@ export default function CreateInvoice() {
                     />
                   </div>
                 </div>
-                <div className="md:col-span-2">
+                <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-slate-700 mb-1">Customer Address</label>
                   <textarea
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -572,7 +545,7 @@ export default function CreateInvoice() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mt-4 border-t pt-4 border-slate-100">
+              <div className="grid grid-cols-2 gap-3 mt-4 border-t pt-4 border-slate-100">
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Start KM</label>
                   <input
@@ -593,16 +566,20 @@ export default function CreateInvoice() {
                     onChange={e => setEndKm(Number(e.target.value))}
                   />
                 </div>
-                <DateTimeInput
-                  label="Start Time"
-                  value={startTime}
-                  onChange={setStartTime}
-                />
-                <DateTimeInput
-                  label="End Time"
-                  value={endTime}
-                  onChange={setEndTime}
-                />
+                <div className="col-span-2">
+                  <DateTimeInput
+                    label="Start Time"
+                    value={startTime}
+                    onChange={setStartTime}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <DateTimeInput
+                    label="End Time"
+                    value={endTime}
+                    onChange={setEndTime}
+                  />
+                </div>
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Free KM</label>
                   <input
@@ -627,29 +604,29 @@ export default function CreateInvoice() {
             </div>
 
             {/* 2. Rent Calculation */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <div className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm">
               <h2 className="text-lg font-semibold mb-4 text-slate-800">Rent Calculation</h2>
-              <div className="flex bg-slate-100 rounded-lg p-1 mb-4 w-fit flex-wrap gap-1">
+              <div className="flex bg-slate-100 rounded-lg p-1 mb-4 flex-wrap gap-1">
                 <button
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${rentType === 'fixed' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${rentType === 'fixed' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
                   onClick={() => setRentType('fixed')}
                 >
                   Fixed
                 </button>
                 <button
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${rentType === 'hour' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${rentType === 'hour' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
                   onClick={() => setRentType('hour')}
                 >
                   Hour
                 </button>
                 <button
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${rentType === 'day' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${rentType === 'day' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
                   onClick={() => setRentType('day')}
                 >
                   Day Rent
                 </button>
                 <button
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${rentType === 'km' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${rentType === 'km' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
                   onClick={() => setRentType('km')}
                 >
                   KM
@@ -657,7 +634,7 @@ export default function CreateInvoice() {
               </div>
 
               {rentType === 'fixed' && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Total Fixed Amount (₹)</label>
                     <input
@@ -693,7 +670,7 @@ export default function CreateInvoice() {
               )}
 
               {rentType === 'hour' && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Total Hours</label>
                     <input
@@ -817,8 +794,8 @@ export default function CreateInvoice() {
             </div>
 
             {/* 3. Driver Beta & Night Halt */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-              <div className="flex items-center justify-between">
+            <div className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <div className={`w-10 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer transition-colors ${enableDriverBeta ? 'bg-blue-600' : ''}`} onClick={() => setEnableDriverBeta(!enableDriverBeta)}>
                     <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${enableDriverBeta ? 'translate-x-4' : ''}`}></div>
@@ -826,12 +803,12 @@ export default function CreateInvoice() {
                   <span className="text-sm font-medium text-slate-700">Driver Beta</span>
                 </div>
                 {enableDriverBeta && (
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 w-full sm:w-auto">
                     <input
                       type="text"
                       inputMode="numeric"
                       placeholder="Days"
-                      className="w-20 px-3 py-1 border border-slate-300 rounded-lg text-sm"
+                      className="flex-1 sm:w-20 px-3 py-1 border border-slate-300 rounded-lg text-sm"
                       value={driverBetaDays || ''}
                       onChange={e => setDriverBetaDays(Number(e.target.value))}
                     />
@@ -839,7 +816,7 @@ export default function CreateInvoice() {
                       type="text"
                       inputMode="numeric"
                       placeholder="₹/day"
-                      className="w-24 px-3 py-1 border border-slate-300 rounded-lg text-sm"
+                      className="flex-1 sm:w-24 px-3 py-1 border border-slate-300 rounded-lg text-sm"
                       value={driverBetaAmountPerDay || ''}
                       onChange={e => setDriverBetaAmountPerDay(Number(e.target.value))}
                     />
@@ -847,7 +824,7 @@ export default function CreateInvoice() {
                 )}
               </div>
 
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <div className={`w-10 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer transition-colors ${enableNightHalt ? 'bg-blue-600' : ''}`} onClick={() => setEnableNightHalt(!enableNightHalt)}>
                     <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${enableNightHalt ? 'translate-x-4' : ''}`}></div>
@@ -855,12 +832,12 @@ export default function CreateInvoice() {
                   <span className="text-sm font-medium text-slate-700">Outstation Driver Charge</span>
                 </div>
                 {enableNightHalt && (
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 w-full sm:w-auto">
                     <input
                       type="text"
                       inputMode="numeric"
                       placeholder="Days"
-                      className="w-20 px-3 py-1 border border-slate-300 rounded-lg text-sm"
+                      className="flex-1 sm:w-20 px-3 py-1 border border-slate-300 rounded-lg text-sm"
                       value={nightHaltDays || ''}
                       onChange={e => setNightHaltDays(Number(e.target.value))}
                     />
@@ -868,7 +845,7 @@ export default function CreateInvoice() {
                       type="text"
                       inputMode="numeric"
                       placeholder="₹/day"
-                      className="w-24 px-3 py-1 border border-slate-300 rounded-lg text-sm"
+                      className="flex-1 sm:w-24 px-3 py-1 border border-slate-300 rounded-lg text-sm"
                       value={nightHaltAmountPerDay || ''}
                       onChange={e => setNightHaltAmountPerDay(Number(e.target.value))}
                     />
@@ -878,14 +855,14 @@ export default function CreateInvoice() {
             </div>
 
             {/* 4. Additional Costs */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <div className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm">
               <h2 className="text-lg font-semibold mb-4 text-slate-800">Additional Costs</h2>
 
               <div className="flex gap-2 mb-4">
                 <input
                   type="text"
                   placeholder="Details (e.g. Toll, Parking)"
-                  className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                  className="flex-1 min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm"
                   value={newCostLabel}
                   onChange={e => setNewCostLabel(e.target.value)}
                 />
@@ -893,7 +870,7 @@ export default function CreateInvoice() {
                   type="text"
                   inputMode="numeric"
                   placeholder="Amount"
-                  className="w-32 px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                  className="w-24 sm:w-32 px-3 py-2 border border-slate-300 rounded-lg text-sm"
                   value={newCostAmount}
                   onChange={e => setNewCostAmount(e.target.value)}
                 />
@@ -925,8 +902,8 @@ export default function CreateInvoice() {
             </div>
 
             {/* 4. Controls */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-              <div className="flex items-center justify-between">
+            <div className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <div className={`w-10 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer transition-colors ${enableDiscount ? 'bg-blue-600' : ''}`} onClick={() => setEnableDiscount(!enableDiscount)}>
                     <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${enableDiscount ? 'translate-x-4' : ''}`}></div>
@@ -945,7 +922,7 @@ export default function CreateInvoice() {
                 )}
               </div>
 
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <div className={`w-10 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer transition-colors ${enableGst ? 'bg-blue-600' : ''}`} onClick={() => { setEnableGst(!enableGst); if (!enableGst) setEnableIgst(false); }}>
                     <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${enableGst ? 'translate-x-4' : ''}`}></div>
@@ -967,7 +944,7 @@ export default function CreateInvoice() {
                 )}
               </div>
 
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <div className={`w-10 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer transition-colors ${enableIgst ? 'bg-blue-600' : ''}`} onClick={() => { setEnableIgst(!enableIgst); if (!enableIgst) setEnableGst(false); }}>
                     <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${enableIgst ? 'translate-x-4' : ''}`}></div>
@@ -989,7 +966,7 @@ export default function CreateInvoice() {
                 )}
               </div>
 
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <label className="text-sm font-medium text-slate-700">Advance Amount</label>
                 <input
                   type="text"
@@ -1005,9 +982,9 @@ export default function CreateInvoice() {
 
           </div>
 
-          {/* Preview / Sidebar */}
+          {/* Bill Summary Sidebar */}
           <div className="lg:col-span-1">
-            <div className="bg-slate-900 text-white p-6 rounded-xl shadow-lg sticky top-6">
+            <div className="bg-slate-900 text-white p-5 sm:p-6 rounded-xl shadow-lg lg:sticky lg:top-6">
               <h3 className="text-lg font-semibold mb-6">Bill Summary</h3>
 
               <div className="space-y-3 text-sm border-b border-slate-700 pb-4 mb-4">
