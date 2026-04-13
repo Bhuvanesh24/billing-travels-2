@@ -197,7 +197,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   doc.text('TAX INVOICE', 105, contactY + 16, { align: 'center' });
 
   // --- Invoice Info ---
-  doc.setFontSize(10);
+  doc.setFontSize(11);
   doc.setTextColor(0);
 
   // Left Side: Bill To
@@ -206,23 +206,25 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   doc.text('Bill To:', 15, 66);
   doc.setFont(FONT_STYLE, 'normal');
   doc.setTextColor(0, 0, 0); // Black color for content
+  doc.setFontSize(9); // Content font size
 
   let currentY = 72;
-  const lineHeight = 4;
+  const lineHeight = 4.2;
   const labelX = 15;
-  const colonX = 55; // Position where all colons align
-  const valueX = 58; // Position where values start (after colon and space)
+  const colonX = 42; // Tighter gap
+  const valueX = 45; // Position where values start
 
   const fullCustomerName = data.customerTitle ? `${data.customerTitle}. ${data.customerName}` : data.customerName;
   doc.text('Customer Name', labelX, currentY);
   doc.text(':', colonX, currentY);
-  doc.text(fullCustomerName || '-', valueX, currentY);
-  currentY += lineHeight;
+  const nameLines = doc.splitTextToSize(fullCustomerName || '-', 80);
+  doc.text(nameLines, valueX, currentY);
+  currentY += lineHeight * nameLines.length;
 
   if (data.customerCompanyName) {
     doc.text('Company', labelX, currentY);
     doc.text(':', colonX, currentY);
-    const companyLines = doc.splitTextToSize(data.customerCompanyName, 65);
+    const companyLines = doc.splitTextToSize(data.customerCompanyName, 80);
     doc.text(companyLines, valueX, currentY);
     currentY += lineHeight * companyLines.length;
   }
@@ -231,7 +233,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
     doc.text('Address', labelX, currentY);
     doc.text(':', colonX, currentY);
     // Split address into lines if too long - extend to right column boundary
-    const addressLines = doc.splitTextToSize(data.customerAddress, 65);
+    const addressLines = doc.splitTextToSize(data.customerAddress, 80);
     doc.text(addressLines, valueX, currentY);
     currentY += (lineHeight * addressLines.length);
   }
@@ -247,14 +249,16 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
 
   // Right Side: Invoice Details
   const rightColX = 130;
-  const rightColonX = 155; // Position where colons align
-  const rightValueX = 158; // Position  where values start
+  const rightColonX = 152; // Tighter gap for right side
+  const rightValueX = 155; 
 
   doc.setFont(FONT_STYLE, 'bold');
+  doc.setFontSize(11);
   doc.setTextColor(41, 128, 185); // Blue color for heading
   doc.text('Invoice Details:', rightColX, 66);
   doc.setFont(FONT_STYLE, 'normal');
   doc.setTextColor(0, 0, 0); // Black color for content
+  doc.setFontSize(9);
 
   let rightY = 72;
   doc.text('Invoice No', rightColX, rightY);
@@ -289,22 +293,23 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
 
   // Trip Details heading in blue
   doc.setFont(FONT_STYLE, 'bold');
+  doc.setFontSize(11);
   doc.setTextColor(41, 128, 185); // Blue color for heading
   doc.text('Trip Details:', 15, tripDetailsY);
   doc.setFont(FONT_STYLE, 'normal');
   doc.setTextColor(0, 0, 0);
+  doc.setFontSize(9.0);
 
-  let tripY = tripDetailsY + 5;
+  let tripY = tripDetailsY + 6;
   const leftColX = 15;
-  const leftColonX = 55;
-  const leftValueX = 58;
+  const leftColonX = 42;
+  const leftValueX = 45;
   const rightTripColX = 130;
-  const rightTripColonX = 155;
-  const rightTripValueX = 158;
+  const rightTripColonX = 152;
+  const rightTripValueX = 155;
 
   // Max width for From/To values so they don't overlap with the right column
-  const locationMaxWidth = 68; // leaves gap before rightTripColX (130)
-
+  const locationMaxWidth = 80; // Consistent with company/address wrap
   // Row 1: From | Trip Start
   // const truncatedFrom = (data.tripStartLocation || '-').length > maxLocationLength
   //   ? (data.tripStartLocation || '-').substring(0, maxLocationLength) + '...'
@@ -527,7 +532,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   const bankDetailsY = finalY;
 
   // --- Bank Details Section (Left Side) ---
-  doc.setFontSize(9);
+  doc.setFontSize(10.5);
   doc.setFont(FONT_STYLE, 'bold');
   doc.setTextColor(41, 128, 185); // Blue color
   doc.text('Bank Details :', 15, bankDetailsY);
@@ -535,7 +540,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
 
   let currentBankY = bankDetailsY + 6;
   doc.setFont(FONT_STYLE, 'bold');
-  doc.setFontSize(8);
+  doc.setFontSize(9);
 
   doc.text('Name : Karur Vysya Bank', 15, currentBankY);
   currentBankY += 5;
@@ -689,10 +694,11 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   }
 
   // Signature (Right)
+  const signatureCenterX = 165;
   doc.setFontSize(10);
   doc.setFont(FONT_STYLE, 'bold');
   doc.setTextColor(41, 128, 185); // Blue color for signature text
-  doc.text('For SRI GOKILAM TRAVELS', 190, bottomSectionY + 4, { align: 'right' });
+  doc.text('For SRI GOKILAM TRAVELS', signatureCenterX, bottomSectionY + 4, { align: 'center' });
   try {
     const sigRes = await fetch(signatureImg);
     if (sigRes.ok) {
@@ -705,14 +711,15 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
       const sigW = 40;
       const sigH = 15;
       // Explicitly specifying 'PNG' helps jsPDF render transparent alpha channels properly
-      doc.addImage(sigBase64, 'PNG', 190 - sigW, bottomSectionY + 6, sigW, sigH);
+      doc.addImage(sigBase64, 'PNG', signatureCenterX - (sigW / 2), bottomSectionY + 6, sigW, sigH);
     }
   } catch (err) {
     console.warn('Signature image could not be loaded:', err);
   }
 
-  // Space for signature (aligns vertically with bottom of QR)
-  doc.text('Proprietor', 190, bottomSectionY + qrSize + 2, { align: 'right' });
+  // Proprietor shifted slightly right to center perfectly under the signature ink's visual mass (the loop) rather than the mathematical center
+  const proprietorVisuallyAlignedX = signatureCenterX + 3;
+  doc.text('Proprietor', proprietorVisuallyAlignedX, bottomSectionY + 26, { align: 'center' });
   doc.setTextColor(0, 0, 0); // Reset to black
 
   // Footer messages at the very bottom
