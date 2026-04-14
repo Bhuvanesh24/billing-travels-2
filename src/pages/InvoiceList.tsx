@@ -229,19 +229,35 @@ export default function InvoiceList() {
                       <h3 className="mt-4 font-semibold text-slate-900 truncate" title={file.name}>
                         {file.name}
                       </h3>
-                      <div className="mt-4 flex gap-2">
+                      <div className="mt-4 flex gap-2 flex-wrap">
                         <a
                           href={file.webViewLink}
                           target="_blank"
                           rel="noreferrer"
-                          className="flex-1 px-3 py-2 text-sm font-medium text-center text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                          className="flex-1 min-w-[60px] px-3 py-2 text-sm font-medium text-center text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
                         >
                           View
                         </a>
+
+                        {/* Edit Button - only if we can extract ID */}
+                        {/* {(() => {
+                          const match = file.name.match(/INV-(\d+)/);
+                          const invId = match ? `#${match[1]}` : null;
+                          return invId ? (
+                            <Link
+                              to={`/edit/${encodeURIComponent(invId)}`}
+                              state={{ driveFileId: file.id }}
+                              className="flex-1 min-w-[60px] px-3 py-2 text-sm font-medium text-center text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center justify-center gap-1"
+                            >
+                              Edit
+                            </Link>
+                          ) : null;
+                        })()} */}
+
                         <button
                           onClick={() => handleDelete(file)}
                           disabled={deletingId === file.id}
-                          className="px-3 py-2 text-sm font-medium text-red-500 bg-red-50 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                          className="flex-1 min-w-[60px] px-3 py-2 text-sm font-medium text-red-500 bg-red-50 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
                         >
                           {deletingId === file.id ? (
                             <Loader2 size={16} className="animate-spin" />

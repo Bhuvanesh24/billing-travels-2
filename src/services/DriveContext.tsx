@@ -11,6 +11,7 @@ interface DriveContextType {
   signIn: () => Promise<void>;
   signOut: () => void;
   uploadFile: (file: File, customName?: string) => Promise<UploadResult>;
+  updateFile: (fileId: string, file: File) => Promise<UploadResult>;
   deleteFile: (fileId: string) => Promise<void>;
   listPDFs: (pageSize?: number, pageToken?: string, searchQuery?: string) => Promise<{ files: DriveFile[], nextPageToken?: string }>;
   loading: boolean;
@@ -77,6 +78,20 @@ export function DriveProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateFile = async (fileId: string, file: File) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await driveService.updateFile(fileId, file);
+      return result;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update file');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const deleteFile = async (fileId: string) => {
     try {
       setError(null);
@@ -106,6 +121,7 @@ export function DriveProvider({ children }: { children: ReactNode }) {
         signIn,
         signOut,
         uploadFile,
+        updateFile,
         deleteFile,
         listPDFs,
         loading,

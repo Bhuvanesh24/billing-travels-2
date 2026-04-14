@@ -252,6 +252,41 @@ export class GoogleDriveService {
     }
 
     /**
+     * Update an existing file on Google Drive
+     * @param fileId - ID of the file to update
+     * @param file - New File object
+     */
+    async updateFile(fileId: string, file: File): Promise<UploadResult> {
+        this.ensureSignedIn();
+
+        const response = await fetch(
+            `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+            {
+                method: 'PATCH',
+                headers: new Headers({
+                    'Authorization': 'Bearer ' + this.accessToken,
+                    'Content-Type': file.type
+                }),
+                body: file,
+            }
+        );
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Update failed: ${response.statusText} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        // Since media upload doesn't return webViewLink by default, fetch it if needed
+        // For simplicity, we assume the ID is consistent
+        return {
+            id: fileId,
+            name: file.name,
+            ...data
+        };
+    }
+
+    /**
      * Delete a file by ID
      * @param fileId - The ID of the file to delete
      */

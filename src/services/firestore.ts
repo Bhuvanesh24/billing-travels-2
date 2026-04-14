@@ -60,6 +60,17 @@ export async function getNextInvoiceNumber(): Promise<number> {
 }
 
 /**
+ * Gets the next invoice number without incrementing it.
+ * Useful for showing the potential number in the UI.
+ */
+export async function peekNextInvoiceNumber(): Promise<number> {
+    const counterRef = doc(db, 'counters', 'invoiceNumber');
+    const { getDoc } = await import('firebase/firestore');
+    const counterDoc = await getDoc(counterRef);
+    return counterDoc.exists() ? (counterDoc.data().current as number) + 1 : 1;
+}
+
+/**
  * Formats invoice number with leading zeros
  * @param number - Invoice number (e.g., 1, 2, 123)
  * @returns Formatted string (e.g., "#00001", "#00002", "#00123")
@@ -69,7 +80,7 @@ export function formatInvoiceNumber(number: number): string {
 }
 
 /**
- * Gets and formats the next invoice number
+ * Gets and formats the next invoice number (Atomic)
  * @returns Promise<string> - Formatted invoice number (e.g., "#00001")
  */
 export async function getFormattedInvoiceNumber(): Promise<string> {
@@ -77,4 +88,36 @@ export async function getFormattedInvoiceNumber(): Promise<string> {
     const formatted = formatInvoiceNumber(number);
     console.log('🔢 Formatted invoice number:', formatted);
     return formatted;
+}
+
+/**
+ * Save full invoice metadata to Firestore
+ */
+export async function saveInvoiceMetadata(invoiceId: string, data: any) {
+    const { setDoc, doc } = await import('firebase/firestore');
+    const invoiceRef = doc(db, 'invoices', invoiceId);
+    await setDoc(invoiceRef, {
+        ...data,
+        updatedAt: new Date().toISOString(),
+        createdAt: data.createdAt || new Date().toISOString()
+    });
+}
+
+/**
+ * Get full invoice metadata from Firestore
+ */
+export async function getInvoiceMetadata(invoiceId: string) {
+    const { getDoc, doc } = await import('firebase/firestore');
+    const invoiceRef = doc(db, 'invoices', invoiceId);
+    const snap = await getDoc(invoiceRef);
+    return snap.exists() ? snap.data() : null;
+}
+
+/**
+ * Delete invoice metadata from Firestore
+ */
+export async function deleteInvoiceMetadata(invoiceId: string) {
+    const { deleteDoc, doc } = await import('firebase/firestore');
+    const invoiceRef = doc(db, 'invoices', invoiceId);
+    await deleteDoc(invoiceRef);
 }

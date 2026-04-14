@@ -1,11 +1,17 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, Printer, Loader2, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { type AdditionalCost, type RentType } from '../lib/calculator';
 import { useDrive } from '../services/useDrive';
 import { generateInvoicePDF } from '../services/pdfGeneration';
-import { getFormattedInvoiceNumber } from '../services/firestore';
+import { 
+  getFormattedInvoiceNumber, 
+  peekNextInvoiceNumber, 
+  formatInvoiceNumber, 
+  getInvoiceMetadata, 
+  saveInvoiceMetadata 
+} from '../services/firestore';
 
 interface DateTimeInputProps {
   label: string;
@@ -89,7 +95,16 @@ const DateTimeInput = ({ label, value, onChange }: DateTimeInputProps) => {
 
 export default function CreateInvoice() {
   const navigate = useNavigate();
-  const { isSignedIn, signIn, uploadFile, loading: driveLoading } = useDrive();
+  const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const driveFileId = (location.state as any)?.driveFileId;
+  const isEditing = !!id;
+
+  const { isSignedIn, signIn, uploadFile, updateFile, loading: driveLoading } = useDrive();
+
+  // Next number preview
+  const [nextPlannedNumber, setNextPlannedNumber] = useState<string>('');
+  const [loadingMetadata, setLoadingMetadata] = useState(isEditing);
 
   // Customer & Trip Details
   const [customerTitle, setCustomerTitle] = useState('Mr');
@@ -135,6 +150,71 @@ export default function CreateInvoice() {
 
   // Upload State
   const [uploading, setUploading] = useState(false);
+
+  // Load existing metadata if editing
+  useEffect(() => {
+    async function load() {
+      if (isEditing && id) {
+        try {
+          const data = await getInvoiceMetadata(decodeURIComponent(id));
+          if (data) {
+            setCustomerTitle(data.customerTitle || 'Mr');
+            setCustomerName(data.customerName || '');
+            setCustomerCompanyName(data.customerCompanyName || 'M/S ');
+            setCustomerAddress(data.customerAddress || '');
+            setCustomerGstNo(data.customerGstNo || '');
+            setDriverName(data.driverName || '');
+            setVehicleNo(data.vehicleNo || '');
+            setVehicleType(data.vehicleType || '');
+            setTripStartLocation(data.tripStartLocation || '');
+            setTripEndLocation(data.tripEndLocation || '');
+            setStartKm(data.startKm || 0);
+            setEndKm(data.endKm || 0);
+            setStartTime(data.startTime || '');
+            setEndTime(data.endTime || '');
+            setRentType(data.rentType || 'fixed');
+            setFixedAmount(data.fixedAmount || 0);
+            setHours(data.hours || 0);
+            setRatePerHour(data.ratePerHour || 0);
+            setDays(data.days || 0);
+            setRatePerDay(data.ratePerDay || 0);
+            setFuelChargePerKm(data.fuelChargePerKm || 0);
+            setFreeKm(data.freeKm || 0);
+            setRatePerKm(data.ratePerKm || 0);
+            setChargePerKmFixed(data.chargePerKmFixed || 0);
+            setChargePerKmHour(data.chargePerKmHour || 0);
+            setAdditionalCosts(data.additionalCosts || []);
+            setEnableDriverBeta(data.enableDriverBeta || false);
+            setDriverBetaDays(data.driverBetaDays || 0);
+            setDriverBetaAmountPerDay(data.driverBetaAmountPerDay || 0);
+            setEnableNightHalt(data.enableNightHalt || false);
+            setNightHaltDays(data.nightHaltDays || 0);
+            setNightHaltAmountPerDay(data.nightHaltAmountPerDay || 0);
+            setEnableDiscount(data.enableDiscount || false);
+            setDiscountAmount(data.discountAmount || 0);
+            setEnableGst(data.enableGst || false);
+            setGstPercentage(data.gstPercentage || 5);
+            setEnableIgst(data.enableIgst || false);
+            setIgstPercentage(data.igstPercentage || 5);
+            setAdvance(data.advance || 0);
+            setNextPlannedNumber(data.invoiceNumber);
+          } else {
+            toast.error('Invoice data not found. You might need to re-type it once.');
+            setNextPlannedNumber(decodeURIComponent(id));
+          }
+        } catch (err) {
+          console.error(err);
+          toast.error('Failed to load invoice details');
+        } finally {
+          setLoadingMetadata(false);
+        }
+      } else {
+        // Fetch next number for display
+        peekNextInvoiceNumber().then(num => setNextPlannedNumber(formatInvoiceNumber(num)));
+      }
+    }
+    load();
+  }, [isEditing, id]);
 
 
   // Totals
@@ -293,24 +373,19 @@ export default function CreateInvoice() {
 
   const handleGenerateInvoice = async () => {
     try {
-
-
       // Validation
       if (!customerName.trim()) {
         toast.error('Please enter customer name');
         return;
       }
-
       if (startKm < 0 || endKm < 0) {
         toast.error('KM readings cannot be negative');
         return;
       }
-
       if (endKm < startKm) {
         toast.error('End KM cannot be less than Start KM');
         return;
       }
-
       if (startTime && endTime) {
         if (new Date(endTime) < new Date(startTime)) {
           toast.error('End Time cannot be before Start Time');
@@ -320,97 +395,105 @@ export default function CreateInvoice() {
 
       setUploading(true);
 
-      // Check if signed in, if not, trigger sign-in
+      // Check if signed in
       if (!isSignedIn) {
         await signIn();
       }
 
+      let invoiceNumber = nextPlannedNumber;
+      const loadingToast = toast.loading(isEditing ? 'Updating invoice...' : 'Generating invoice...');
 
-      // 1. Get Next Invoice Number from Firestore
-      const loadingToast = toast.loading('Generating invoice number...');
-      let invoiceNumber: string;
       try {
-        invoiceNumber = await getFormattedInvoiceNumber();
-        toast.success(`Invoice ${invoiceNumber} created`, { id: loadingToast });
+        // 1. Prepare Invoice Data
+        const invoiceData = {
+          invoiceNumber,
+          customerTitle,
+          customerName,
+          customerCompanyName,
+          customerAddress,
+          customerGstNo,
+          driverName,
+          vehicleNo,
+          vehicleType,
+          tripStartLocation,
+          tripEndLocation,
+          startKm,
+          endKm,
+          startTime,
+          endTime,
+          rentType,
+          fixedAmount,
+          hours,
+          ratePerHour,
+          days,
+          ratePerDay,
+          fuelChargePerKm,
+          totalKm,
+          freeKm,
+          chargeableKm,
+          ratePerKm,
+          chargePerKmFixed,
+          chargePerKmHour,
+          additionalCosts,
+          enableDriverBeta,
+          driverBetaDays,
+          driverBetaAmountPerDay,
+          enableNightHalt,
+          nightHaltDays,
+          nightHaltAmountPerDay,
+          enableDiscount,
+          discountAmount,
+          enableGst,
+          gstPercentage,
+          gstAmount,
+          enableIgst,
+          igstPercentage,
+          igstAmount,
+          advance,
+          grandTotal
+        };
+
+        // 2. Generate PDF Blob
+        const { blob, fileName } = await generateInvoicePDF(invoiceData);
+        const pdfFile = new File([blob], fileName, { type: 'application/pdf' });
+
+        // 3. Upload or Update in Drive
+        if (isEditing && driveFileId) {
+          await updateFile(driveFileId, pdfFile);
+        } else {
+          // If creating new, we officially get the next number now
+          // This ensures no gaps if the above steps failed
+          invoiceNumber = await getFormattedInvoiceNumber();
+          
+          // If the actual number differs from the peeked one (concurrency), regenerate
+          if (invoiceNumber !== nextPlannedNumber) {
+            invoiceData.invoiceNumber = invoiceNumber;
+            const regened = await generateInvoicePDF(invoiceData);
+            const refiled = new File([regened.blob], regened.fileName, { type: 'application/pdf' });
+            await uploadFile(refiled, regened.fileName);
+          } else {
+            await uploadFile(pdfFile, fileName);
+          }
+        }
+
+        // 4. Save Metadata to Firestore
+        await saveInvoiceMetadata(invoiceNumber, invoiceData);
+
+        toast.success(isEditing ? 'Invoice updated successfully!' : 'Invoice created successfully!', {
+          id: loadingToast,
+          duration: 4000
+        });
+
+        // Navigate back to invoice list
+        navigate('/');
       } catch (error) {
-        toast.error('Failed to generate invoice number', { id: loadingToast });
-        console.log(error);
+        console.error('Generation error:', error);
+        toast.error(isEditing ? 'Failed to update invoice' : 'Failed to create invoice', { id: loadingToast });
+      } finally {
         setUploading(false);
-        return;
       }
-
-      // 2. Prepare Invoice Data
-      const invoiceData = {
-        invoiceNumber,
-        customerTitle,
-        customerName,
-        customerCompanyName,
-        customerAddress,
-        customerGstNo,
-        driverName,
-        vehicleNo,
-        vehicleType,
-        tripStartLocation,
-        tripEndLocation,
-        startKm,
-        endKm,
-        startTime,
-        endTime,
-        rentType,
-        fixedAmount,
-        hours,
-        ratePerHour,
-        days,
-        ratePerDay,
-        fuelChargePerKm,
-        totalKm,
-        freeKm,
-        chargeableKm,
-        ratePerKm,
-        chargePerKmFixed,
-        chargePerKmHour,
-        additionalCosts,
-        enableDriverBeta,
-        driverBetaDays,
-        driverBetaAmountPerDay,
-        enableNightHalt,
-        nightHaltDays,
-        nightHaltAmountPerDay,
-        enableDiscount,
-        discountAmount,
-        enableGst,
-        gstPercentage,
-        gstAmount,
-        enableIgst,
-        igstPercentage,
-        igstAmount,
-        advance,
-        grandTotal
-      };
-
-      // 3. Generate PDF Blob
-      const { blob, fileName } = await generateInvoicePDF(invoiceData);
-
-      // 4. Create File object
-      const pdfFile = new File([blob], fileName, { type: 'application/pdf' });
-
-      // 4. Upload to Google Drive
-      const toastId = toast.loading('Uploading invoice...');
-      const result = await uploadFile(pdfFile, fileName);
-
-      toast.success(`Invoice uploaded successfully!`, {
-        id: toastId,
-        duration: 4000
-      });
-      console.log('Upload successful:', result);
-
-      // Navigate back to invoice list
-      navigate('/');
     } catch (error) {
-      console.error('Upload error:', error);
-      const msg = error instanceof Error ? error.message : 'Failed to upload invoice';
-      toast.error(msg);
-    } finally {
+      console.error(error);
       setUploading(false);
     }
   };
@@ -426,10 +509,23 @@ export default function CreateInvoice() {
             <ArrowLeft size={18} />
             Back
           </Link>
-          <h1 className="text-xl font-bold text-slate-900">Create New Invoice</h1>
+          <h1 className="text-xl font-bold text-slate-900">
+            {isEditing ? `Edit Invoice ${id}` : 'Create New Invoice'}
+          </h1>
+          {nextPlannedNumber && (
+            <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">
+              #{nextPlannedNumber.replace('#', '')}
+            </span>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {loadingMetadata ? (
+          <div className="flex flex-col items-center justify-center p-12 bg-white rounded-xl border border-slate-200 shadow-sm">
+            <Loader2 className="animate-spin text-blue-600 mb-4" size={32} />
+            <p className="text-slate-500">Loading invoice details...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Form Area */}
           <div className="lg:col-span-2 space-y-5">
 
@@ -1076,6 +1172,7 @@ export default function CreateInvoice() {
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
