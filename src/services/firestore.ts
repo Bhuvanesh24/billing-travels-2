@@ -13,7 +13,7 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const db: Firestore = getFirestore(app);
+export const db: Firestore = getFirestore(app);
 
 console.log('✅ Firebase initialized -', { projectId: firebaseConfig.projectId });
 

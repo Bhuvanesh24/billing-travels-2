@@ -7,11 +7,14 @@ import { useDrive } from '../services/useDrive';
 import { generateInvoicePDF } from '../services/pdfGeneration';
 import { 
   getFormattedInvoiceNumber, 
-  peekNextInvoiceNumber, 
-  formatInvoiceNumber, 
-  getInvoiceMetadata, 
-  saveInvoiceMetadata 
+  saveInvoiceMetadata,
+  getInvoiceMetadata,
+  peekNextInvoiceNumber,
+  formatInvoiceNumber,
+  db
 } from '../services/firestore';
+import { tripService } from '../services/tripService';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface DateTimeInputProps {
   label: string;
@@ -151,9 +154,12 @@ export default function CreateInvoice() {
   // Upload State
   const [uploading, setUploading] = useState(false);
 
-  // Load existing metadata if editing
+  // Load existing metadata if editing OR if ending a trip
   useEffect(() => {
     async function load() {
+      const searchParams = new URLSearchParams(location.search);
+      const tripId = searchParams.get('tripId');
+
       if (isEditing && id) {
         try {
           const data = await getInvoiceMetadata(decodeURIComponent(id));
@@ -199,7 +205,7 @@ export default function CreateInvoice() {
             setAdvance(data.advance || 0);
             setNextPlannedNumber(data.invoiceNumber);
           } else {
-            toast.error('Invoice data not found. You might need to re-type it once.');
+            toast.error('Invoice data not found.');
             setNextPlannedNumber(decodeURIComponent(id));
           }
         } catch (err) {
@@ -208,13 +214,57 @@ export default function CreateInvoice() {
         } finally {
           setLoadingMetadata(false);
         }
+      } else if (tripId) {
+        try {
+          setLoadingMetadata(true);
+          const trip = await tripService.getTripById(tripId);
+          if (trip) {
+            // Pre-fill from trip
+            setCustomerName(trip.customerName || '');
+            setDriverName(trip.driverName || '');
+            setVehicleNo(trip.vehicleNo || '');
+            setTripStartLocation(trip.tripStartLocation || '');
+            setStartKm(trip.startKm || 0);
+            setStartTime(trip.startTime || '');
+            
+            // Try to fetch detailed customer/car info from masters
+            if (trip.customerId) {
+                const custRef = doc(db, 'customers', trip.customerId);
+                const custSnap = await getDoc(custRef);
+                if (custSnap.exists()) {
+                    setCustomerCompanyName(custSnap.data().companyName || 'M/S ');
+                    setCustomerAddress(custSnap.data().address || '');
+                    setCustomerGstNo(custSnap.data().gstNo || '');
+                }
+            }
+
+            if (trip.carId) {
+                const carRef = doc(db, 'cars', trip.carId);
+                const carSnap = await getDoc(carRef);
+                if (carSnap.exists()) {
+                    setVehicleType(carSnap.data().type || '');
+                }
+            }
+            
+            // Set end time to now
+            setEndTime(new Date().toISOString().slice(0, 16));
+            
+            toast.success('Trip data loaded');
+          }
+        } catch (err) {
+          console.error('Error pre-filling from trip:', err);
+          toast.error('Failed to load trip details');
+        } finally {
+          setLoadingMetadata(false);
+          peekNextInvoiceNumber().then(num => setNextPlannedNumber(formatInvoiceNumber(num)));
+        }
       } else {
         // Fetch next number for display
         peekNextInvoiceNumber().then(num => setNextPlannedNumber(formatInvoiceNumber(num)));
       }
     }
     load();
-  }, [isEditing, id]);
+  }, [isEditing, id, location.search]);
 
 
   // Totals
@@ -395,17 +445,17 @@ export default function CreateInvoice() {
 
       setUploading(true);
 
-      // Check if signed in
-      if (!isSignedIn) {
-        await signIn();
-      }
-
       let invoiceNumber = nextPlannedNumber;
       const loadingToast = toast.loading(isEditing ? 'Updating invoice...' : 'Generating invoice...');
 
       try {
-        // 1. Prepare Invoice Data
-        const invoiceData = {
+        // 1. Lock in the official invoice number (atomic)
+        if (!isEditing) {
+          invoiceNumber = await getFormattedInvoiceNumber();
+        }
+
+        // 2. Build full invoice data with ALL amount fields for compatibility
+        const invoiceData: any = {
           invoiceNumber,
           customerTitle,
           customerName,
@@ -450,44 +500,70 @@ export default function CreateInvoice() {
           igstPercentage,
           igstAmount,
           advance,
-          grandTotal
+          grandTotal,
+          totalAmount: grandTotal,  // always save both for compatibility
         };
 
-        // 2. Generate PDF Blob
+        // 3. Generate PDF Blob
         const { blob, fileName } = await generateInvoicePDF(invoiceData);
         const pdfFile = new File([blob], fileName, { type: 'application/pdf' });
 
-        // 3. Upload or Update in Drive
-        if (isEditing && driveFileId) {
-          await updateFile(driveFileId, pdfFile);
-        } else {
-          // If creating new, we officially get the next number now
-          // This ensures no gaps if the above steps failed
-          invoiceNumber = await getFormattedInvoiceNumber();
-          
-          // If the actual number differs from the peeked one (concurrency), regenerate
-          if (invoiceNumber !== nextPlannedNumber) {
-            invoiceData.invoiceNumber = invoiceNumber;
-            const regened = await generateInvoicePDF(invoiceData);
-            const refiled = new File([regened.blob], regened.fileName, { type: 'application/pdf' });
-            await uploadFile(refiled, regened.fileName);
+        // 4. ALWAYS save to Firestore first — this is the source of truth
+        //    Use a stable UUID as the doc ID (not the Drive file ID)
+        const firestoreDocId = isEditing
+          ? (id ? decodeURIComponent(id) : crypto.randomUUID())
+          : crypto.randomUUID();
+
+        const tripId = new URLSearchParams(location.search).get('tripId');
+
+        await saveInvoiceMetadata(firestoreDocId, {
+          ...invoiceData,
+          ...(isEditing ? {} : { paymentStatus: 'pending' }),
+          tripId: tripId || null,
+          driveFileId: null,  // updated after Drive upload succeeds
+        });
+
+        // 5. Attempt Drive upload (optional — won't block if it fails)
+        try {
+          let driveResult: any;
+          if (isEditing && driveFileId) {
+            driveResult = await updateFile(driveFileId, pdfFile);
           } else {
-            await uploadFile(pdfFile, fileName);
+            if (!isSignedIn) {
+              await signIn();
+            }
+            driveResult = await uploadFile(pdfFile, fileName);
           }
+          // Update the Firestore doc with the Drive file ID
+          if (driveResult?.id) {
+            const { doc: firestoreDoc, updateDoc: firestoreUpdate } = await import('firebase/firestore');
+            await firestoreUpdate(firestoreDoc(db, 'invoices', firestoreDocId), {
+              driveFileId: driveResult.id
+            });
+          }
+        } catch (driveError) {
+          console.warn('Drive upload failed (invoice still saved locally):', driveError);
+          toast('Invoice saved. Drive upload failed — connect Google Drive to upload.', { icon: '⚠️' });
         }
 
-        // 4. Save Metadata to Firestore
-        await saveInvoiceMetadata(invoiceNumber, invoiceData);
+        // 6. If from a trip, close the trip
+        if (tripId) {
+          await tripService.endTrip(tripId, {
+            invoiceId: firestoreDocId,
+            endKm,
+            endTime,
+            tripEndLocation
+          });
+        }
 
-        toast.success(isEditing ? 'Invoice updated successfully!' : 'Invoice created successfully!', {
+        toast.success(isEditing ? 'Invoice updated!' : 'Invoice created!', {
           id: loadingToast,
           duration: 4000
         });
 
-        // Navigate back to invoice list
-        navigate('/');
+        navigate('/invoices');
       } catch (error) {
-        console.error('Generation error:', error);
+        console.error('Invoice generation error:', error);
         toast.error(isEditing ? 'Failed to update invoice' : 'Failed to create invoice', { id: loadingToast });
       } finally {
         setUploading(false);
@@ -497,6 +573,7 @@ export default function CreateInvoice() {
       setUploading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen bg-slate-50 p-3 sm:p-6">

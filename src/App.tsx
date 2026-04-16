@@ -1,17 +1,24 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import InvoiceList from './pages/InvoiceList';
-import CreateInvoice from './pages/CreateInvoice';
 import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import Trips from './pages/Trips';
+import InvoiceList from './pages/InvoiceList';
+import Customers from './pages/Customers';
+import Drivers from './pages/Drivers';
+import Cars from './pages/Cars';
+import Accounts from './pages/Accounts';
+import CreateInvoice from './pages/CreateInvoice';
 import { DriveProvider } from './services/DriveContext';
 import { AuthProvider, useAuth } from './services/AuthContext';
 import { Toaster } from 'react-hot-toast';
+import Layout from './components/Layout';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isLoggedIn } = useAuth();
   if (!isLoggedIn) {
     return <Navigate to="/login" replace />;
   }
-  return <>{children}</>;
+  return <Layout>{children}</Layout>;
 }
 
 function AppRoutes() {
@@ -27,7 +34,55 @@ function AppRoutes() {
         path="/"
         element={
           <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/trips"
+        element={
+          <ProtectedRoute>
+            <Trips />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/invoices"
+        element={
+          <ProtectedRoute>
             <InvoiceList />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/customers"
+        element={
+          <ProtectedRoute>
+            <Customers />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/drivers"
+        element={
+          <ProtectedRoute>
+            <Drivers />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/cars"
+        element={
+          <ProtectedRoute>
+            <Cars />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/accounts"
+        element={
+          <ProtectedRoute>
+            <Accounts />
           </ProtectedRoute>
         }
       />
@@ -58,17 +113,6 @@ function App() {
         <Toaster position="top-center" />
         <Router>
           <AppRoutes />
-          <footer className="bg-slate-50 text-center py-6 text-slate-400 text-sm font-medium">
-            Copyright &copy; 2026 Gokilam Travels. All rights reserved. Developed by{' '}
-            <a
-              href="https://intinf.in"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-slate-600 hover:text-blue-600 font-bold transition-colors"
-            >
-              IntInf
-            </a>
-          </footer>
         </Router>
       </DriveProvider>
     </AuthProvider>

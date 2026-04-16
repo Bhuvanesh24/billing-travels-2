@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useAuth } from '../services/AuthContext';
+import { useDrive } from '../services/useDrive';
 import { Lock, User, Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
     const { login } = useAuth();
+    const { signIn } = useDrive();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -137,7 +139,25 @@ export default function Login() {
                                 (e.currentTarget.style.backgroundColor = '#8B0000')
                             }
                         >
-                            Sign In
+                            Sign In to ERP
+                        </button>
+
+                        <div className="relative my-6">
+                            <div className="absolute inset-0 flex items-center">
+                                <span className="w-full border-t border-slate-100"></span>
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase tracking-widest font-black">
+                                <span className="bg-white px-4 text-slate-300">Cloud Sync (Optional)</span>
+                            </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => signIn()}
+                          className="w-full bg-white border border-slate-200 text-slate-700 py-2.5 rounded-lg font-bold text-xs flex items-center justify-center gap-3 hover:bg-slate-50 transition-all shadow-sm"
+                        >
+                          <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
+                          Connect Google Drive
                         </button>
                     </form>
                 </div>
