@@ -7,14 +7,14 @@ import {
   Car as CarIcon, 
   Loader2, 
   IndianRupee, 
-  Wrench, 
   History,
   X,
-  CreditCard
+  Activity
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { masterService, type Car } from '../services/masterService';
 import { carExpenseService, type CarExpense } from '../services/carExpenseService';
+import { Pagination } from '../components/Pagination';
 
 export default function Cars() {
   const [cars, setCars] = useState<Car[]>([]);
@@ -108,6 +108,18 @@ export default function Cars() {
     }
   };
 
+  const handleDeleteCar = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this car? This will NOT delete its expense history.')) return;
+    try {
+      await masterService.deleteCar(id);
+      toast.success('Car removed from fleet');
+      fetchCars();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to delete car');
+    }
+  };
+
   const handleOpenExpenseModal = (car: Car) => {
     setSelectedCar(car);
     setExpenseForm({
@@ -148,13 +160,27 @@ export default function Cars() {
     }
   };
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
   const filteredCars = cars.filter(c => 
     c.regNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.model.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const totalPages = Math.ceil(filteredCars.length / pageSize);
+  const paginatedCars = filteredCars.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  // Reset to first page when searching
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   return (
-    <div className="space-y-6">
+    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Cars & Fleet</h1>
@@ -181,68 +207,91 @@ export default function Cars() {
         />
       </div>
 
-      {/* Cars Grid */}
+      {/* Cars Table */}
       {loading ? (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-20 flex flex-col items-center justify-center">
+        <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-20 flex flex-col items-center justify-center">
           <Loader2 className="animate-spin text-blue-600 mb-4" size={40} />
           <p className="text-slate-500 font-medium">Loading fleet...</p>
         </div>
       ) : filteredCars.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredCars.map((car) => (
-            <div key={car.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group overflow-hidden relative">
-              <div className="flex justify-between items-start mb-6">
-                <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-600 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
-                  <CarIcon size={28} />
-                </div>
-                <div className="flex gap-1">
-                  <button 
-                    onClick={() => handleOpenCarModal(car)}
-                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                  <button 
-                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                    <h3 className="font-extrabold text-slate-900 text-xl tracking-tight uppercase">{car.regNo}</h3>
-                    <p className="text-slate-500 text-sm font-medium">{car.model} • {car.type}</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 pt-2">
-                    <button 
-                      onClick={() => handleOpenExpenseModal(car)}
-                      className="flex items-center justify-center gap-2 py-2 bg-slate-50 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-100 transition-colors border border-slate-200"
-                    >
-                        <IndianRupee size={14} />
-                        Add Expense
-                    </button>
-                    <button 
-                      onClick={() => handleOpenHistory(car)}
-                      className="flex items-center justify-center gap-2 py-2 bg-slate-50 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-100 transition-colors border border-slate-200"
-                    >
-                        <History size={14} />
-                        History
-                    </button>
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                        <Wrench size={10} />
-                        Active Service
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-400">{car.fuelType}</span>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="bg-white border text-sm border-slate-200 rounded-lg shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                  <th className="px-4 py-3 font-semibold uppercase text-[10px] tracking-wider">Registration & Details</th>
+                  <th className="px-4 py-3 font-semibold uppercase text-[10px] tracking-wider">Specifications</th>
+                  <th className="px-4 py-3 font-semibold uppercase text-[10px] tracking-wider">Quick Actions</th>
+                  <th className="px-4 py-3 font-semibold uppercase text-[10px] tracking-wider text-right">Manage</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {paginatedCars.map((car) => (
+                  <tr key={car.id} className="hover:bg-slate-50 transition-colors group">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-slate-500">
+                          <CarIcon size={16} />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-800 uppercase leading-tight">{car.regNo}</p>
+                          <p className="text-xs text-slate-500">{car.model}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-slate-800 font-bold">{car.model}</span>
+                        <span className="text-[10px] text-slate-500 font-medium">{car.type}</span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-100 uppercase">
+                            {car.fuelType}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => handleOpenExpenseModal(car)}
+                          className="flex items-center justify-center gap-1.5 px-2 py-1 bg-white text-slate-600 rounded text-[10px] font-semibold hover:bg-slate-100 transition-colors border border-slate-200"
+                        >
+                          <IndianRupee size={12} /> Add Exp
+                        </button>
+                        <button 
+                          onClick={() => handleOpenHistory(car)}
+                          className="flex items-center justify-center gap-1.5 px-2 py-1 bg-white text-slate-600 rounded text-[10px] font-semibold hover:bg-slate-100 transition-colors border border-slate-200"
+                        >
+                          <History size={12} /> Log
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2 transition-opacity">
+                        <button onClick={() => handleOpenCarModal(car)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Edit">
+                          <Edit2 size={14} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteCar(car.id!)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" 
+                          title="Delete"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            totalItems={filteredCars.length}
+            pageSize={pageSize}
+          />
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-16 text-center">
@@ -256,38 +305,46 @@ export default function Cars() {
 
       {/* Car Modal */}
       {isCarModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <h2 className="font-bold text-slate-900">{editingCar ? 'Edit Vehicle' : 'Add New Vehicle'}</h2>
-              <button onClick={() => setIsCarModalOpen(false)} className="text-slate-500 hover:bg-slate-200 p-1 rounded-lg">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-lg shadow-xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200">
+            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white">
+                  <CarIcon size={18} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-800 leading-tight">{editingCar ? 'Edit Vehicle' : 'Add New Vehicle'}</h2>
+                  <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Fleet Registry</p>
+                </div>
+              </div>
+              <button onClick={() => setIsCarModalOpen(false)} className="text-slate-400 hover:bg-slate-100 p-1.5 rounded transition-colors border border-transparent hover:border-slate-200">
                 <X size={18} />
               </button>
             </div>
             <form onSubmit={handleCarSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Registration Number</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Registration Number</label>
                 <input 
                   type="text" required placeholder="e.g. TN-01-AB-1234"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none uppercase font-bold"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none uppercase font-bold text-sm shadow-sm"
                   value={carForm.regNo}
                   onChange={(e) => setCarForm({...carForm, regNo: e.target.value.toUpperCase()})}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Model</label>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Model</label>
                     <input 
                     type="text" required placeholder="e.g. Innova"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm shadow-sm"
                     value={carForm.model}
                     onChange={(e) => setCarForm({...carForm, model: e.target.value})}
                     />
                 </div>
                 <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Type</label>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Type</label>
                     <select 
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm font-semibold shadow-sm"
                       value={carForm.type}
                       onChange={(e) => setCarForm({...carForm, type: e.target.value})}
                     >
@@ -302,9 +359,9 @@ export default function Cars() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Fuel Type</label>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Fuel Type</label>
                     <select 
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm font-semibold shadow-sm"
                       value={carForm.fuelType}
                       onChange={(e) => setCarForm({...carForm, fuelType: e.target.value})}
                     >
@@ -315,9 +372,9 @@ export default function Cars() {
                     </select>
                 </div>
                 <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Owner Status</label>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Owner Status</label>
                     <select 
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm font-semibold shadow-sm"
                       value={carForm.ownerName}
                       onChange={(e) => setCarForm({...carForm, ownerName: e.target.value})}
                     >
@@ -326,9 +383,11 @@ export default function Cars() {
                     </select>
                 </div>
               </div>
-              <button type="submit" className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold shadow-lg mt-4">
-                {editingCar ? 'Update Vehicle' : 'Save Vehicle'}
-              </button>
+              <div className="pt-2">
+                <button type="submit" className="w-full py-2.5 bg-slate-900 text-white rounded font-bold shadow-sm hover:bg-black transition-all">
+                  {editingCar ? 'Update Vehicle' : 'Save Vehicle'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -336,35 +395,39 @@ export default function Cars() {
 
       {/* Expense Modal */}
       {isExpenseModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
-            <div className="p-6 bg-slate-900 text-white relative">
-                <button onClick={() => setIsExpenseModalOpen(false)} className="absolute right-4 top-4 text-slate-400 hover:text-white">
-                    <X size={20} />
-                </button>
-                <div className="flex items-center gap-3 mb-2">
-                    <IndianRupee size={24} className="text-blue-400" />
-                    <h2 className="font-bold text-xl">Add Expense</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-sm rounded-lg shadow-xl overflow-hidden border border-slate-200 animate-in slide-in-from-bottom duration-300">
+            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white">
+                        <IndianRupee size={18} />
+                    </div>
+                    <div>
+                        <h2 className="text-sm font-bold text-slate-800 leading-tight">Log Expense</h2>
+                        <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{selectedCar?.regNo}</p>
+                    </div>
                 </div>
-                <p className="text-slate-400 text-sm">Logging for {selectedCar?.regNo}</p>
+                <button onClick={() => setIsExpenseModalOpen(false)} className="text-slate-400 hover:bg-slate-100 p-1.5 rounded transition-colors border border-transparent hover:border-slate-200">
+                    <X size={18} />
+                </button>
             </div>
             
             <form onSubmit={handleExpenseSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Date</label>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Date</label>
                     <input 
                         type="date" required
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm"
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
                         value={expenseForm.date}
                         onChange={(e) => setExpenseForm({...expenseForm, date: e.target.value})}
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Amount</label>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Amount</label>
                     <input 
-                        type="number" required placeholder="₹ 0.00"
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold"
+                        type="number" required placeholder="0.00"
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm font-bold outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
                         value={expenseForm.amount || ''}
                         onChange={(e) => setExpenseForm({...expenseForm, amount: Number(e.target.value)})}
                     />
@@ -372,9 +435,9 @@ export default function Cars() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Category</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Category</label>
                 <select 
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm font-semibold outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
                     value={expenseForm.category}
                     onChange={(e) => setExpenseForm({...expenseForm, category: e.target.value as any})}
                 >
@@ -388,19 +451,21 @@ export default function Cars() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Details</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Details/Notes</label>
                 <input 
                     type="text" required placeholder="e.g. Oil change, New tires..."
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm font-semibold outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
                     value={expenseForm.label}
                     onChange={(e) => setExpenseForm({...expenseForm, label: e.target.value})}
                 />
               </div>
 
-              <button type="submit" className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
-                <CreditCard size={18} />
-                Confirm Payment
-              </button>
+              <div className="pt-2">
+                <button type="submit" className="w-full py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-sm">
+                  <Activity size={16} />
+                  Record Expense
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -408,9 +473,9 @@ export default function Cars() {
 
       {/* History Modal */}
       {isHistoryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl h-[80vh] flex flex-col overflow-hidden animate-in zoom-in duration-300">
-             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-2xl rounded-lg shadow-xl h-[80vh] flex flex-col overflow-hidden border border-slate-200 animate-in zoom-in duration-300">
+             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                 <div className="flex items-center gap-4">
                     <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white">
                         <History size={20} />
@@ -420,7 +485,7 @@ export default function Cars() {
                         <p className="text-xs text-slate-500">{selectedCar?.regNo} • {selectedCar?.model}</p>
                     </div>
                 </div>
-                <button onClick={() => setIsHistoryModalOpen(false)} className="text-slate-400 hover:bg-slate-200 p-2 rounded-lg">
+                <button onClick={() => setIsHistoryModalOpen(false)} className="text-slate-500 hover:bg-slate-100 p-2 rounded-lg border border-transparent hover:border-slate-200 transition-colors">
                     <X size={20} />
                 </button>
              </div>

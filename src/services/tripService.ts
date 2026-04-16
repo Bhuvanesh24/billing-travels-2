@@ -27,6 +27,7 @@ export interface Trip {
   endTime?: string;
   tripEndLocation?: string;
   invoiceId?: string;
+  totalBill?: number;
   
   // Snapshot of Master data at start time (to prevent issues if master is edited later)
   customerName?: string;
@@ -88,5 +89,18 @@ export const tripService = {
     const ref = doc(db, COLLECTION_NAME, id);
     const snap = await getDoc(ref);
     return snap.exists() ? ({ id: snap.id, ...snap.data() } as Trip) : null;
+  },
+
+  async getCompletedTripsWithoutInvoice() {
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      where('status', '==', 'completed')
+    );
+    const snap = await getDocs(q);
+    // Client-side filter for those without invoiceId
+    return snap.docs
+      .map(d => ({ id: d.id, ...d.data() } as Trip))
+      .filter(t => !t.invoiceId)
+      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
   }
 };

@@ -5,10 +5,7 @@ import {
   Edit2, 
   Trash2, 
   Users, 
-  Building2, 
-  Phone, 
   FileText, 
-  ArrowRight,
   X,
   Loader2,
   CheckCircle2,
@@ -18,6 +15,7 @@ import toast from 'react-hot-toast';
 import { masterService, type Customer } from '../services/masterService';
 import { db } from '../services/firestore';
 import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { Pagination } from '../components/Pagination';
 
 interface CustomerInvoice {
   id: string;
@@ -113,6 +111,18 @@ export default function Customers() {
     }
   };
 
+  const handleDeleteCustomer = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this customer? This will NOT delete their invoices.')) return;
+    try {
+      await masterService.deleteCustomer(id);
+      toast.success('Customer deleted successfully');
+      fetchCustomers();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to delete customer');
+    }
+  };
+
   const handleOpenDetails = async (customer: Customer) => {
     setSelectedCustomer(customer);
     setIsDetailsModalOpen(true);
@@ -165,17 +175,31 @@ export default function Customers() {
     }
   };
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
   const filteredCustomers = customers.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.companyName.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(filteredCustomers.length / pageSize);
+  const paginatedCustomers = filteredCustomers.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
   );
 
   const pendingAmount = customerInvoices
     .filter(inv => inv.paymentStatus === 'pending')
     .reduce((sum, inv) => sum + inv.totalAmount, 0);
 
+  // Reset to first page when searching
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   return (
-    <div className="space-y-6">
+    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Customers (CRM)</h1>
@@ -204,92 +228,116 @@ export default function Customers() {
         </div>
       </div>
 
-      {/* Customers List */}
+      {/* Customers Table */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center p-20 bg-white rounded-xl border border-slate-200">
+        <div className="flex flex-col items-center justify-center p-20 bg-white rounded-lg border border-slate-200">
           <Loader2 className="animate-spin text-blue-600 mb-4" size={32} />
           <p className="text-slate-500 font-medium">Loading customers...</p>
         </div>
       ) : filteredCustomers.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredCustomers.map((customer) => (
-            <div key={customer.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group">
-              <div className="flex justify-between items-start mb-4">
-                <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600 group-hover:bg-slate-900 group-hover:text-white transition-all">
-                  <Building2 size={24} />
-                </div>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => handleOpenModal(customer)} className="p-2 text-slate-400 hover:text-blue-600 rounded-lg">
-                    <Edit2 size={16} />
-                  </button>
-                  <button className="p-2 text-slate-400 hover:text-red-600 rounded-lg">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-bold text-slate-900 text-lg leading-tight">{customer.companyName}</h3>
-                  <p className="text-slate-500 text-xs font-medium uppercase tracking-wide mt-1">{customer.name}</p>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <Phone size={14} className="text-slate-400" />
-                    <span>{customer.phone}</span>
-                  </div>
-                  {customer.gstNo && (
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded w-fit">
-                      GST: {customer.gstNo}
-                    </div>
-                  )}
-                </div>
-
-                <button 
-                  onClick={() => handleOpenDetails(customer)}
-                  className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 bg-slate-50 text-slate-900 rounded-xl text-sm font-bold hover:bg-slate-900 hover:text-white transition-all border border-slate-100 group/btn"
-                >
-                  View History
-                  <ArrowRight size={16} className="group-hover/btn:translate-x-1 transition-transform" />
-                </button>
-              </div>
-            </div>
-          ))}
+        <div className="bg-white border text-sm border-slate-200 rounded-lg shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                  <th className="px-4 py-3 font-semibold uppercase text-[10px] tracking-wider">Company Details</th>
+                  <th className="px-4 py-3 font-semibold uppercase text-[10px] tracking-wider">Contact Info</th>
+                  <th className="px-4 py-3 font-semibold uppercase text-[10px] tracking-wider">GST No</th>
+                  <th className="px-4 py-3 font-semibold uppercase text-[10px] tracking-wider text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {paginatedCustomers.map((customer) => (
+                  <tr key={customer.id} className="hover:bg-slate-50 transition-colors group">
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-slate-800">{customer.companyName}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{customer.name}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-slate-700">{customer.phone}</span>
+                        {customer.email && <span className="text-xs text-slate-500">{customer.email}</span>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {customer.gstNo ? (
+                        <span className="inline-flex items-center text-[10px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                          {customer.gstNo}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400 italic">None</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-2 transition-opacity">
+                        <button onClick={() => handleOpenDetails(customer)} className="px-2 py-1 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors">
+                          History
+                        </button>
+                        <button onClick={() => handleOpenModal(customer)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Edit">
+                          <Edit2 size={14} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteCustomer(customer.id!)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" 
+                          title="Delete"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            totalItems={filteredCustomers.length}
+            pageSize={pageSize}
+          />
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-16 text-center">
-          <Users size={48} className="mx-auto mb-4 text-slate-200" />
-          <p className="text-slate-500 italic">No customers matched your search.</p>
+        <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-16 text-center">
+          <Users size={40} className="mx-auto mb-3 text-slate-200" />
+          <p className="text-slate-500 font-medium">No customers matched your search.</p>
         </div>
       )}
 
-      {/* Add/Edit Modal */}
       {isCustomerModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <h2 className="font-bold text-slate-900">{editingCustomer ? 'Edit Customer' : 'Add New Customer'}</h2>
-              <button onClick={() => setIsCustomerModalOpen(false)} className="text-slate-500 hover:bg-slate-200 p-1 rounded-lg">
+          <div className="bg-white w-full max-w-lg rounded-lg shadow-xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200">
+            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white">
+                  <Plus size={18} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-800 leading-tight">{editingCustomer ? 'Update Profile' : 'New Customer'}</h2>
+                  <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">CRM Registry</p>
+                </div>
+              </div>
+              <button onClick={() => setIsCustomerModalOpen(false)} className="text-slate-400 hover:bg-slate-100 p-1.5 rounded transition-colors border border-transparent hover:border-slate-200">
                 <X size={18} />
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Company Name</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Company Name</label>
                   <input 
                     type="text" required placeholder="e.g. M/S ABC Corp"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm font-semibold shadow-sm"
                     value={formData.companyName}
                     onChange={(e) => setFormData({...formData, companyName: e.target.value})}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Contact Person</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Contact Person</label>
                   <input 
-                    type="text" required placeholder="e.g. Rahul Sharma"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                    type="text" placeholder="name"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm font-semibold shadow-sm"
                     value={formData.name}
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
                   />
@@ -298,19 +346,19 @@ export default function Customers() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Phone Number</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Phone Number</label>
                   <input 
-                    type="tel" required placeholder="+91 ..."
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                    type="tel" placeholder="+91 ..."
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm font-semibold shadow-sm"
                     value={formData.phone}
                     onChange={(e) => setFormData({...formData, phone: e.target.value})}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Email Address</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Email Address</label>
                   <input 
                     type="email" placeholder="client@example.com"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm font-semibold shadow-sm"
                     value={formData.email}
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
                   />
@@ -318,29 +366,31 @@ export default function Customers() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">GST Number</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">GST Number</label>
                 <input 
                   type="text" placeholder="22AAAAA0000A1Z5"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none uppercase"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm font-bold shadow-sm uppercase"
                   value={formData.gstNo}
                   onChange={(e) => setFormData({...formData, gstNo: e.target.value.toUpperCase()})}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Address</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Address</label>
                 <textarea 
                   rows={2} placeholder="Full billing address..."
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm font-semibold shadow-sm resize-none"
                   value={formData.address}
                   onChange={(e) => setFormData({...formData, address: e.target.value})}
                 />
               </div>
 
-              <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold shadow-lg mt-4 flex items-center justify-center gap-2">
-                <CheckCircle2 size={18} />
-                {editingCustomer ? 'Update Customer' : 'Save Customer'}
-              </button>
+              <div className="pt-2">
+                <button type="submit" className="w-full py-2.5 bg-slate-900 text-white rounded font-bold shadow-sm hover:bg-black transition-all flex items-center justify-center gap-2">
+                  <CheckCircle2 size={18} />
+                  {editingCustomer ? 'Update Profile' : 'Register Customer'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -349,49 +399,49 @@ export default function Customers() {
       {/* History Modal */}
       {isDetailsModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl h-[85vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
-             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center text-white">
-                        <Users size={24} />
+          <div className="bg-white w-full max-w-4xl rounded-lg shadow-xl h-[85vh] flex flex-col overflow-hidden border border-slate-200 animate-in slide-in-from-bottom duration-300">
+             <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-slate-900 rounded flex items-center justify-center text-white">
+                        <Users size={18} />
                     </div>
                     <div>
-                        <h2 className="font-bold text-slate-900 text-xl tracking-tight">{selectedCustomer?.companyName}</h2>
-                        <p className="text-xs text-slate-500">Billing History & Outstanding Payments</p>
+                        <h2 className="text-sm font-bold text-slate-800 leading-tight">{selectedCustomer?.companyName}</h2>
+                        <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Account History & Statements</p>
                     </div>
                 </div>
-                <button onClick={() => setIsDetailsModalOpen(false)} className="text-slate-400 hover:bg-slate-200 p-2 rounded-lg">
-                    <X size={24} />
+                <button onClick={() => setIsDetailsModalOpen(false)} className="text-slate-400 hover:bg-slate-100 p-1.5 rounded transition-colors border border-transparent hover:border-slate-200">
+                    <X size={18} />
                 </button>
              </div>
 
-             <div className="flex-1 overflow-y-auto p-6">
-                <div className="mb-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="bg-blue-600 p-6 rounded-2xl text-white shadow-lg shadow-blue-100">
-                        <p className="text-blue-100 text-sm font-medium">Pending Balance</p>
-                        <p className="text-3xl font-extrabold mt-1">₹ {pendingAmount.toLocaleString()}</p>
+             <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="bg-blue-600 p-5 rounded-lg text-white shadow-sm">
+                        <p className="text-blue-100 text-[10px] font-bold uppercase tracking-wider">Pending Balance</p>
+                        <p className="text-2xl font-bold mt-1">₹ {pendingAmount.toLocaleString()}</p>
                     </div>
-                    <div className="bg-slate-900 p-6 rounded-2xl text-white shadow-lg shadow-slate-100">
-                        <p className="text-slate-400 text-sm font-medium">Total Billed</p>
-                        <p className="text-3xl font-extrabold mt-1">₹ {customerInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0).toLocaleString()}</p>
+                    <div className="bg-slate-900 p-5 rounded-lg text-white shadow-sm">
+                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Total Billed</p>
+                        <p className="text-2xl font-bold mt-1">₹ {customerInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0).toLocaleString()}</p>
                     </div>
                 </div>
 
-                <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                    <FileText size={18} className="text-slate-400" />
-                    Invoices ({customerInvoices.length})
+                <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <FileText size={16} className="text-slate-400" />
+                    Billed Invoices ({customerInvoices.length})
                 </h3>
 
                 {loadingInvoices ? (
                     <div className="flex flex-col items-center justify-center py-12">
-                        <Loader2 className="animate-spin text-blue-600 mb-2" size={32} />
-                        <p className="text-sm text-slate-400">Loading history...</p>
+                        <Loader2 className="animate-spin text-blue-600 mb-2" size={24} />
+                        <p className="text-xs text-slate-400 font-medium">Loading history...</p>
                     </div>
                 ) : customerInvoices.length > 0 ? (
-                    <div className="overflow-x-auto">
+                    <div className="border border-slate-200 rounded-lg overflow-hidden shadow-sm">
                         <table className="w-full text-left">
-                            <thead>
-                                <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                            <thead className="bg-slate-50">
+                                <tr className="text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                                     <th className="px-4 py-3">Date</th>
                                     <th className="px-4 py-3">Invoice #</th>
                                     <th className="px-4 py-3">Amount</th>
@@ -401,30 +451,32 @@ export default function Customers() {
                             </thead>
                             <tbody>
                                 {customerInvoices.map((inv) => (
-                                    <tr key={inv.id} className="border-b border-slate-50 group hover:bg-slate-50 transition-colors">
-                                        <td className="px-4 py-4 text-xs text-slate-500 font-medium">
-                                            {new Date(inv.createdAt).toLocaleDateString()}
+                                    <tr key={inv.id} className="border-b border-slate-100 group hover:bg-slate-50 transition-colors">
+                                        <td className="px-4 py-3 text-[11px] text-slate-500 font-medium font-mono">
+                                            {new Date(inv.createdAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
                                         </td>
-                                        <td className="px-4 py-4 text-sm font-bold text-slate-900">
+                                        <td className="px-4 py-3 text-xs font-semibold text-slate-800">
                                             {inv.invoiceNumber}
                                         </td>
-                                        <td className="px-4 py-4 text-sm font-extrabold text-slate-900">
+                                        <td className="px-4 py-3 text-xs font-bold text-slate-900">
                                             ₹ {inv.totalAmount.toLocaleString()}
                                         </td>
-                                        <td className="px-4 py-4">
-                                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
-                                                inv.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                                        <td className="px-4 py-3">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
+                                                inv.paymentStatus === 'paid' 
+                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                                                : 'bg-orange-50 text-orange-700 border-orange-100'
                                             }`}>
                                                 {inv.paymentStatus}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-4 text-right">
+                                        <td className="px-4 py-3 text-right">
                                             <button 
                                                 onClick={() => togglePaymentStatus(inv.id, inv.paymentStatus)}
-                                                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
+                                                className={`text-[10px] font-bold px-2 py-1 rounded transition-all border ${
                                                     inv.paymentStatus === 'paid' 
-                                                    ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100' 
-                                                    : 'bg-green-600 text-white hover:bg-green-700 shadow-md'
+                                                    ? 'text-slate-400 border-slate-200 hover:text-slate-600 hover:bg-slate-50' 
+                                                    : 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700 shadow-sm'
                                                 }`}
                                             >
                                                 {inv.paymentStatus === 'paid' ? 'Mark Pending' : 'Mark Paid'}
@@ -436,16 +488,16 @@ export default function Customers() {
                         </table>
                     </div>
                 ) : (
-                    <div className="py-20 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                        <Clock size={40} className="mx-auto mb-3 text-slate-300" />
-                        <p className="text-slate-500 text-sm">No billing history found for this customer.</p>
+                    <div className="py-16 text-center bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                        <Clock size={32} className="mx-auto mb-2 text-slate-300" />
+                        <p className="text-slate-500 text-xs font-medium">No billing history found for this customer.</p>
                     </div>
                 )}
              </div>
 
-             <div className="p-6 bg-slate-50 border-t border-slate-100">
-                 <button onClick={() => setIsDetailsModalOpen(false)} className="w-full py-3 bg-white border border-slate-200 text-slate-900 rounded-xl font-bold hover:bg-slate-100 transition-all">
-                    Close History
+             <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+                 <button onClick={() => setIsDetailsModalOpen(false)} className="px-4 py-1.5 bg-white border border-slate-300 text-slate-700 rounded font-bold text-xs hover:bg-slate-50 transition-all shadow-sm">
+                     Close Record
                  </button>
              </div>
           </div>

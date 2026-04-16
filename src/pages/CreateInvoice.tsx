@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Printer, Loader2, Eye } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  Plus, 
+  Trash2, 
+  Printer, 
+  Loader2, 
+  Eye, 
+  Users, 
+  Car as CarIcon, 
+  IndianRupee 
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { type AdditionalCost, type RentType } from '../lib/calculator';
 import { useDrive } from '../services/useDrive';
@@ -51,15 +61,15 @@ const DateTimeInput = ({ label, value, onChange }: DateTimeInputProps) => {
   const hourOptions = Array.from({ length: 12 }, (_, i) => i + 1); // 1–12
   const minuteOptions = Array.from({ length: 60 }, (_, i) => i);   // 0–59
 
-  const selectCls = 'px-2 py-2 border border-slate-300 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500';
+  const selectCls = 'px-2 py-1.5 border border-slate-300 rounded text-[11px] bg-white outline-none focus:ring-1 focus:ring-blue-500 font-semibold shadow-sm transition-all';
 
   return (
     <div>
-      <label className="block text-xs text-slate-500 mb-1">{label}</label>
-      <div className="flex items-center gap-1 flex-nowrap overflow-x-auto">
+      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{label}</label>
+      <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto">
         <input
           type="date"
-          className="flex-1 min-w-0 px-2 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 min-w-0 px-2 py-1.5 border border-slate-300 rounded text-[11px] font-semibold outline-none focus:ring-1 focus:ring-blue-500 shadow-sm transition-all"
           value={date}
           onClick={(e) => (e.target as HTMLInputElement).showPicker()}
           onChange={(e) => update(e.target.value, hours, minutes, period)}
@@ -73,7 +83,7 @@ const DateTimeInput = ({ label, value, onChange }: DateTimeInputProps) => {
             <option key={h} value={h.toString()}>{h.toString().padStart(2, '0')}</option>
           ))}
         </select>
-        <span className="text-slate-400 font-bold text-sm">:</span>
+        <span className="text-slate-400 font-bold text-xs">:</span>
         <select
           className={selectCls}
           value={parseInt(minutes).toString()}
@@ -325,6 +335,7 @@ export default function CreateInvoice() {
 
   // Grand total = taxable amount + GST/IGST + non-taxable
   const grandTotal = taxableAmount + gstAmount + igstAmount + nonTaxableTotal;
+  const totalBill = Math.round(grandTotal - advance);
 
   const addCost = () => {
     if (!newCostLabel || !newCostAmount) return;
@@ -407,7 +418,8 @@ export default function CreateInvoice() {
         igstPercentage,
         igstAmount,
         advance,
-        grandTotal
+        grandTotal,
+        totalBill
       };
 
       const { blob } = await generateInvoicePDF(invoiceData);
@@ -502,6 +514,7 @@ export default function CreateInvoice() {
           advance,
           grandTotal,
           totalAmount: grandTotal,  // always save both for compatibility
+          totalBill,
         };
 
         // 3. Generate PDF Blob
@@ -552,7 +565,8 @@ export default function CreateInvoice() {
             invoiceId: firestoreDocId,
             endKm,
             endTime,
-            tripEndLocation
+            tripEndLocation,
+            totalBill
           });
         }
 
@@ -576,7 +590,7 @@ export default function CreateInvoice() {
 
 
   return (
-    <div className="min-h-screen bg-slate-50 p-3 sm:p-6">
+    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-6">
       <div className="max-w-4xl mx-auto">
         <div className="mb-6 flex flex-wrap items-center gap-3">
           <Link
@@ -597,9 +611,9 @@ export default function CreateInvoice() {
         </div>
 
         {loadingMetadata ? (
-          <div className="flex flex-col items-center justify-center p-12 bg-white rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex flex-col items-center justify-center p-12 bg-white rounded-lg border border-slate-200 shadow-sm animate-pulse">
             <Loader2 className="animate-spin text-blue-600 mb-4" size={32} />
-            <p className="text-slate-500">Loading invoice details...</p>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Hydrating Form Data...</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -607,168 +621,186 @@ export default function CreateInvoice() {
           <div className="lg:col-span-2 space-y-5">
 
             {/* 1. Trip Details */}
-            <div className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm">
-              <h2 className="text-lg font-semibold mb-4 text-slate-800">Customer & Trip Details</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm">
+              <div className="flex items-center gap-2 mb-6 border-b border-slate-100 pb-3">
+                <div className="w-6 h-6 bg-slate-900 rounded flex items-center justify-center text-white">
+                    <Users size={14} />
+                </div>
+                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-tight">Customer Information</h2>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Customer Name</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Full Name & Title</label>
                   <div className="flex gap-2">
                     <select
-                      className="w-24 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
+                      className="w-24 px-3 py-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-sm font-semibold shadow-sm"
                       value={customerTitle}
                       onChange={e => setCustomerTitle(e.target.value)}
                     >
-                      <option value="Mr">Mr</option>
-                      <option value="Mrs">Mrs</option>
-                      <option value="Ms">Ms</option>
-                      <option value="Dr">Dr</option>
+                      <option value="Mr">Mr.</option>
+                      <option value="Mrs">Mrs.</option>
+                      <option value="Ms">Ms.</option>
+                      <option value="Dr">Dr.</option>
                       <option value="M/S">M/S</option>
                     </select>
                     <input
                       type="text"
-                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                      placeholder="Enter customer name"
+                      className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm font-semibold shadow-sm"
+                      placeholder="e.g. Rahul Sharma"
                       value={customerName}
                       onChange={e => setCustomerName(e.target.value)}
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Company Name</label>
-                  <div className="flex items-center border border-slate-300 rounded-lg focus-within:ring-2 focus-within:ring-blue-500">
-                    <span className="px-3 py-2 bg-slate-100 text-slate-700 font-medium border-r border-slate-300">M/S</span>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Trade Name / Company</label>
+                  <div className="flex items-center border border-slate-300 rounded-md shadow-sm focus-within:ring-1 focus-within:ring-blue-500 focus-within:border-blue-500">
+                    <span className="px-3 py-2 bg-slate-50 text-slate-500 font-bold border-r border-slate-300 text-[10px] uppercase">M/S</span>
                     <input
                       type="text"
-                      className="flex-1 px-3 py-2 outline-none rounded-r-lg"
-                      placeholder="Enter company name"
+                      className="flex-1 min-w-0 px-3 py-2 outline-none rounded-r-md text-sm font-semibold"
+                      placeholder="ABC Enterprise"
                       value={customerCompanyName.replace(/^M\/S\s*/, '')}
                       onChange={e => setCustomerCompanyName('M/S ' + e.target.value)}
                     />
                   </div>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Customer Address</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Billing Address</label>
                   <textarea
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="Enter customer address"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm font-medium shadow-sm resize-none"
+                    placeholder="Provide detailed address for invoice footer"
                     rows={2}
                     value={customerAddress}
                     onChange={e => setCustomerAddress(e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Customer GST No</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">GST Identification No.</label>
                   <input
                     type="text"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm font-bold shadow-sm"
                     placeholder="e.g. 22AAAAA0000A1Z5"
                     value={customerGstNo}
                     onChange={e => setCustomerGstNo(e.target.value)}
                   />
                 </div>
+              </div>
+
+              <div className="flex items-center gap-2 mt-10 mb-6 border-b border-slate-100 pb-3">
+                <div className="w-6 h-6 bg-slate-900 rounded flex items-center justify-center text-white">
+                    <CarIcon size={14} />
+                </div>
+                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-tight">Mission & Fleet Details</h2>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Driver Name</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Operator / Driver</label>
                   <input
                     type="text"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="Enter driver name"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm font-semibold shadow-sm"
+                    placeholder="Assigned driver"
                     value={driverName}
                     onChange={e => setDriverName(e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle No</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Vehicle Plate No.</label>
                   <input
                     type="text"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm font-bold shadow-sm"
                     placeholder="TN 01 AB 1234"
                     value={vehicleNo}
                     onChange={e => setVehicleNo(e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Type</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Vehicle Model / Class</label>
                   <input
                     type="text"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="e.g. Sedan, SUV, Bus"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm font-semibold shadow-sm"
+                    placeholder="e.g. Swift Dzire, Innova"
                     value={vehicleType}
                     onChange={e => setVehicleType(e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Trip Start Location</label>
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="Starting point"
-                    value={tripStartLocation}
-                    onChange={e => setTripStartLocation(e.target.value)}
-                  />
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Route Start Point</label>
+                    <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm font-semibold shadow-sm"
+                        placeholder="Pick-up point"
+                        value={tripStartLocation}
+                        onChange={e => setTripStartLocation(e.target.value)}
+                    />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Trip End Location</label>
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="Destination"
-                    value={tripEndLocation}
-                    onChange={e => setTripEndLocation(e.target.value)}
-                  />
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Final Destination</label>
+                    <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm font-semibold shadow-sm"
+                        placeholder="Drop point"
+                        value={tripEndLocation}
+                        onChange={e => setTripEndLocation(e.target.value)}
+                    />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mt-4 border-t pt-4 border-slate-100">
+              <div className="grid grid-cols-2 gap-5 mt-8 border-t pt-8 border-slate-100">
                 <div>
-                  <label className="block text-xs text-slate-500 mb-1">Start KM</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Opening Odometer</label>
                   <input
                     type="text"
                     inputMode="numeric"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm font-bold shadow-sm"
+                    placeholder="0"
                     value={startKm || ''}
                     onChange={e => setStartKm(Number(e.target.value))}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-500 mb-1">End KM</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Closing Odometer</label>
                   <input
                     type="text"
                     inputMode="numeric"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm font-bold shadow-sm"
+                    placeholder="0"
                     value={endKm || ''}
                     onChange={e => setEndKm(Number(e.target.value))}
                   />
                 </div>
                 <div className="col-span-2">
                   <DateTimeInput
-                    label="Start Time"
+                    label="Departure Timestamp"
                     value={startTime}
                     onChange={setStartTime}
                   />
                 </div>
                 <div className="col-span-2">
                   <DateTimeInput
-                    label="End Time"
+                    label="Arrival Timestamp"
                     value={endTime}
                     onChange={setEndTime}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-500 mb-1">Free KM</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Complimentary KM</label>
                   <input
                     type="text"
                     inputMode="numeric"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                    placeholder="e.g. 50"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm font-bold shadow-sm"
+                    placeholder="0"
                     value={freeKm || ''}
                     onChange={e => setFreeKm(Number(e.target.value))}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-500 mb-1">Chargeable KM</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Chargeable Mileage</label>
                   <input
                     type="number"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-100"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm bg-slate-50 text-slate-600 font-bold outline-none"
                     value={chargeableKm}
                     disabled
                   />
@@ -966,14 +998,21 @@ export default function CreateInvoice() {
               )}
             </div>
 
-            {/* 3. Driver Beta & Night Halt */}
-            <div className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <div className={`w-10 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer transition-colors ${enableDriverBeta ? 'bg-blue-600' : ''}`} onClick={() => setEnableDriverBeta(!enableDriverBeta)}>
-                    <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${enableDriverBeta ? 'translate-x-4' : ''}`}></div>
+            {/* 3. Operational Overheads */}
+            <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 mb-2 border-b border-slate-100 pb-3">
+                <div className="w-6 h-6 bg-slate-900 rounded flex items-center justify-center text-white">
+                    <IndianRupee size={14} />
+                </div>
+                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-tight">Overheads & Allowances</h2>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 rounded border border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-4 flex items-center bg-slate-300 rounded-full p-0.5 cursor-pointer transition-colors shadow-inner ${enableDriverBeta ? 'bg-blue-600' : ''}`} onClick={() => setEnableDriverBeta(!enableDriverBeta)}>
+                    <div className={`bg-white w-3 h-3 rounded-full shadow transform transition-transform ${enableDriverBeta ? 'translate-x-4' : ''}`}></div>
                   </div>
-                  <span className="text-sm font-medium text-slate-700">Driver Beta</span>
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-tight">Driver Beta</span>
                 </div>
                 {enableDriverBeta && (
                   <div className="flex gap-2 w-full sm:w-auto">
@@ -981,7 +1020,7 @@ export default function CreateInvoice() {
                       type="text"
                       inputMode="numeric"
                       placeholder="Days"
-                      className="flex-1 sm:w-20 px-3 py-1 border border-slate-300 rounded-lg text-sm"
+                      className="flex-1 sm:w-20 px-3 py-1.5 border border-slate-300 rounded text-xs font-bold shadow-sm"
                       value={driverBetaDays || ''}
                       onChange={e => setDriverBetaDays(Number(e.target.value))}
                     />
@@ -989,7 +1028,7 @@ export default function CreateInvoice() {
                       type="text"
                       inputMode="numeric"
                       placeholder="₹/day"
-                      className="flex-1 sm:w-24 px-3 py-1 border border-slate-300 rounded-lg text-sm"
+                      className="flex-1 sm:w-24 px-3 py-1.5 border border-slate-300 rounded text-xs font-bold shadow-sm"
                       value={driverBetaAmountPerDay || ''}
                       onChange={e => setDriverBetaAmountPerDay(Number(e.target.value))}
                     />
@@ -997,12 +1036,12 @@ export default function CreateInvoice() {
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <div className={`w-10 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer transition-colors ${enableNightHalt ? 'bg-blue-600' : ''}`} onClick={() => setEnableNightHalt(!enableNightHalt)}>
-                    <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${enableNightHalt ? 'translate-x-4' : ''}`}></div>
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 rounded border border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-4 flex items-center bg-slate-300 rounded-full p-0.5 cursor-pointer transition-colors shadow-inner ${enableNightHalt ? 'bg-blue-600' : ''}`} onClick={() => setEnableNightHalt(!enableNightHalt)}>
+                    <div className={`bg-white w-3 h-3 rounded-full shadow transform transition-transform ${enableNightHalt ? 'translate-x-4' : ''}`}></div>
                   </div>
-                  <span className="text-sm font-medium text-slate-700">Outstation Driver Charge</span>
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-tight">Night Halt / Outstation</span>
                 </div>
                 {enableNightHalt && (
                   <div className="flex gap-2 w-full sm:w-auto">
@@ -1010,7 +1049,7 @@ export default function CreateInvoice() {
                       type="text"
                       inputMode="numeric"
                       placeholder="Days"
-                      className="flex-1 sm:w-20 px-3 py-1 border border-slate-300 rounded-lg text-sm"
+                      className="flex-1 sm:w-20 px-3 py-1.5 border border-slate-300 rounded text-xs font-bold shadow-sm"
                       value={nightHaltDays || ''}
                       onChange={e => setNightHaltDays(Number(e.target.value))}
                     />
@@ -1018,7 +1057,7 @@ export default function CreateInvoice() {
                       type="text"
                       inputMode="numeric"
                       placeholder="₹/day"
-                      className="flex-1 sm:w-24 px-3 py-1 border border-slate-300 rounded-lg text-sm"
+                      className="flex-1 sm:w-24 px-3 py-1.5 border border-slate-300 rounded text-xs font-bold shadow-sm"
                       value={nightHaltAmountPerDay || ''}
                       onChange={e => setNightHaltAmountPerDay(Number(e.target.value))}
                     />
@@ -1027,42 +1066,50 @@ export default function CreateInvoice() {
               </div>
             </div>
 
-            {/* 4. Additional Costs */}
-            <div className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm">
-              <h2 className="text-lg font-semibold mb-4 text-slate-800">Additional Costs</h2>
+            {/* 4. Miscellaneous Costs */}
+            <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm">
+              <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 bg-slate-900 rounded flex items-center justify-center text-white">
+                        <Plus size={14} />
+                    </div>
+                    <h2 className="text-sm font-bold text-slate-800 uppercase tracking-tight">Sundry Expenses</h2>
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Toll, Parking, Permit</span>
+              </div>
 
-              <div className="flex gap-2 mb-4">
+              <div className="flex gap-2 mb-6">
                 <input
                   type="text"
-                  placeholder="Details (e.g. Toll, Parking)"
-                  className="flex-1 min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                  placeholder="e.g. Toll Charges"
+                  className="flex-1 min-w-0 px-3 py-2 border border-slate-300 rounded text-sm font-semibold shadow-sm outline-none focus:ring-1 focus:ring-blue-500"
                   value={newCostLabel}
                   onChange={e => setNewCostLabel(e.target.value)}
                 />
                 <input
                   type="text"
                   inputMode="numeric"
-                  placeholder="Amount"
-                  className="w-24 sm:w-32 px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                  placeholder="₹ 0.00"
+                  className="w-24 sm:w-32 px-3 py-2 border border-slate-300 rounded text-sm font-bold shadow-sm outline-none focus:ring-1 focus:ring-blue-500"
                   value={newCostAmount}
                   onChange={e => setNewCostAmount(e.target.value)}
                 />
                 <button
                   onClick={addCost}
-                  className="bg-slate-900 hover:bg-slate-800 text-white p-2 rounded-lg transition-colors"
+                  className="bg-slate-900 hover:bg-black text-white px-4 rounded font-bold shadow-sm transition-all"
                 >
-                  <Plus size={20} />
+                  Add
                 </button>
               </div>
 
               {additionalCosts.length > 0 ? (
                 <ul className="space-y-2">
                   {additionalCosts.map(cost => (
-                    <li key={cost.id} className="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-lg text-sm">
-                      <span className="text-slate-700">{cost.label}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="font-medium">₹{cost.amount}</span>
-                        <button onClick={() => removeCost(cost.id)} className="text-red-400 hover:text-red-600">
+                    <li key={cost.id} className="flex justify-between items-center bg-slate-50 px-4 py-2.5 rounded border border-slate-200">
+                      <span className="text-xs font-bold text-slate-700 uppercase tracking-tight">{cost.label}</span>
+                      <div className="flex items-center gap-4">
+                        <span className="font-bold text-slate-900">₹ {cost.amount.toLocaleString()}</span>
+                        <button onClick={() => removeCost(cost.id)} className="text-slate-300 hover:text-red-500 transition-colors">
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -1074,33 +1121,40 @@ export default function CreateInvoice() {
               )}
             </div>
 
-            {/* 4. Controls */}
-            <div className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <div className={`w-10 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer transition-colors ${enableDiscount ? 'bg-blue-600' : ''}`} onClick={() => setEnableDiscount(!enableDiscount)}>
-                    <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${enableDiscount ? 'translate-x-4' : ''}`}></div>
+            {/* 4. Financial Adjustments */}
+            <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-4">
+               <div className="flex items-center gap-2 mb-2 border-b border-slate-100 pb-3">
+                <div className="w-6 h-6 bg-slate-900 rounded flex items-center justify-center text-white">
+                    <IndianRupee size={14} />
+                </div>
+                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-tight">Taxes & Adjustments</h2>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 rounded border border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-4 flex items-center bg-slate-300 rounded-full p-0.5 cursor-pointer transition-colors shadow-inner ${enableDiscount ? 'bg-blue-600' : ''}`} onClick={() => setEnableDiscount(!enableDiscount)}>
+                    <div className={`bg-white w-3 h-3 rounded-full shadow transform transition-transform ${enableDiscount ? 'translate-x-4' : ''}`}></div>
                   </div>
-                  <span className="text-sm font-medium text-slate-700">Apply Discount</span>
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-tight">Cash Discount</span>
                 </div>
                 {enableDiscount && (
                   <input
                     type="text"
                     inputMode="numeric"
-                    placeholder="Amount"
-                    className="w-32 px-3 py-1 border border-slate-300 rounded-lg text-sm"
+                    placeholder="₹ 0.00"
+                    className="w-32 px-3 py-1.5 border border-slate-300 rounded text-xs font-bold shadow-sm outline-none focus:ring-1 focus:ring-blue-500"
                     value={discountAmount || ''}
                     onChange={e => setDiscountAmount(Number(e.target.value))}
                   />
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <div className={`w-10 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer transition-colors ${enableGst ? 'bg-blue-600' : ''}`} onClick={() => { setEnableGst(!enableGst); if (!enableGst) setEnableIgst(false); }}>
-                    <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${enableGst ? 'translate-x-4' : ''}`}></div>
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 rounded border border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-4 flex items-center bg-slate-300 rounded-full p-0.5 cursor-pointer transition-colors shadow-inner ${enableGst ? 'bg-blue-600' : ''}`} onClick={() => { setEnableGst(!enableGst); if (!enableGst) setEnableIgst(false); }}>
+                    <div className={`bg-white w-3 h-3 rounded-full shadow transform transition-transform ${enableGst ? 'translate-x-4' : ''}`}></div>
                   </div>
-                  <span className="text-sm font-medium text-slate-700">Add GST</span>
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-tight">GST (CGST/SGST)</span>
                 </div>
                 {enableGst && (
                   <div className="flex items-center gap-2">
@@ -1108,7 +1162,7 @@ export default function CreateInvoice() {
                       type="text"
                       inputMode="numeric"
                       placeholder="%"
-                      className="w-20 px-3 py-1 border border-slate-300 rounded-lg text-sm"
+                      className="w-20 px-3 py-1.5 border border-slate-300 rounded text-xs font-bold shadow-sm outline-none focus:ring-1 focus:ring-blue-500"
                       value={gstPercentage || ''}
                       onChange={e => setGstPercentage(Number(e.target.value))}
                     />
@@ -1117,12 +1171,12 @@ export default function CreateInvoice() {
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <div className={`w-10 h-6 flex items-center bg-gray-300 rounded-full p-1 cursor-pointer transition-colors ${enableIgst ? 'bg-blue-600' : ''}`} onClick={() => { setEnableIgst(!enableIgst); if (!enableIgst) setEnableGst(false); }}>
-                    <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${enableIgst ? 'translate-x-4' : ''}`}></div>
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 rounded border border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-4 flex items-center bg-slate-300 rounded-full p-0.5 cursor-pointer transition-colors shadow-inner ${enableIgst ? 'bg-blue-600' : ''}`} onClick={() => { setEnableIgst(!enableIgst); if (!enableIgst) setEnableGst(false); }}>
+                    <div className={`bg-white w-3 h-3 rounded-full shadow transform transition-transform ${enableIgst ? 'translate-x-4' : ''}`}></div>
                   </div>
-                  <span className="text-sm font-medium text-slate-700">Other State GST (IGST)</span>
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-tight">IGST (Inter-state)</span>
                 </div>
                 {enableIgst && (
                   <div className="flex items-center gap-2">
@@ -1130,7 +1184,7 @@ export default function CreateInvoice() {
                       type="text"
                       inputMode="numeric"
                       placeholder="%"
-                      className="w-20 px-3 py-1 border border-slate-300 rounded-lg text-sm"
+                      className="w-20 px-3 py-1.5 border border-slate-300 rounded text-xs font-bold shadow-sm outline-none focus:ring-1 focus:ring-blue-500"
                       value={igstPercentage || ''}
                       onChange={e => setIgstPercentage(Number(e.target.value))}
                     />
@@ -1139,113 +1193,126 @@ export default function CreateInvoice() {
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <label className="text-sm font-medium text-slate-700">Advance Amount</label>
+              <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-blue-50/50 rounded-lg border border-blue-100">
+                <label className="text-xs font-bold text-blue-900 uppercase tracking-tight">Token / Advance (₹)</label>
                 <input
                   type="text"
                   inputMode="numeric"
-                  placeholder="Amount"
-                  className="w-32 px-3 py-1 border border-slate-300 rounded-lg text-sm"
+                  placeholder="₹ 0.00"
+                  className="w-32 px-3 py-1.5 border border-blue-200 rounded text-xs font-bold shadow-sm outline-none focus:ring-1 focus:ring-blue-600 bg-white"
                   value={advance || ''}
                   onChange={e => setAdvance(Number(e.target.value))}
                 />
               </div>
-
             </div>
 
           </div>
 
           {/* Bill Summary Sidebar */}
           <div className="lg:col-span-1">
-            <div className="bg-slate-900 text-white p-5 sm:p-6 rounded-xl shadow-lg lg:sticky lg:top-6">
-              <h3 className="text-lg font-semibold mb-6">Bill Summary</h3>
+            <div className="bg-slate-900 text-white rounded-lg shadow-xl lg:sticky lg:top-6 overflow-hidden border border-slate-800">
+               <div className="p-6 border-b border-slate-800 bg-slate-800/50">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">Financial Abstract</h3>
+               </div>
 
-              <div className="space-y-3 text-sm border-b border-slate-700 pb-4 mb-4">
-                <div className="flex justify-between text-slate-300">
-                  <span>Rent</span>
-                  <span>₹{rentTotal.toFixed(2)}</span>
+              <div className="p-6 space-y-4">
+                <div className="space-y-3 text-xs font-semibold border-b border-slate-800 pb-4">
+                    <div className="flex justify-between text-slate-400">
+                      <span className="uppercase tracking-tight">Main Rent</span>
+                      <span>₹ {rentTotal.toLocaleString()}</span>
+                    </div>
+                    {additionalCosts.map(cost => (
+                    <div key={cost.id} className="flex justify-between text-slate-400">
+                        <span className="uppercase tracking-tight">{cost.label}</span>
+                        <span>₹ {cost.amount.toLocaleString()}</span>
+                    </div>
+                    ))}
+                    {(enableDriverBeta || enableNightHalt) && (
+                        <div className="space-y-2 pt-1">
+                            {enableDriverBeta && (
+                                <div className="flex justify-between text-slate-400 italic">
+                                    <span>Driver Allowance ({driverBetaDays}d)</span>
+                                    <span>₹ {driverBetaTotal.toLocaleString()}</span>
+                                </div>
+                            )}
+                            {enableNightHalt && (
+                                <div className="flex justify-between text-slate-400 italic">
+                                    <span>Halt Charges ({nightHaltDays}d)</span>
+                                    <span>₹ {nightHaltTotal.toLocaleString()}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
-                {additionalCosts.map(cost => (
-                  <div key={cost.id} className="flex justify-between text-slate-400">
-                    <span>{cost.label}</span>
-                    <span>₹{cost.amount.toFixed(2)}</span>
-                  </div>
-                ))}
-                {enableDriverBeta && driverBetaTotal > 0 && (
-                  <div className="flex justify-between text-slate-400">
-                    <span>Driver Beta ({driverBetaDays}d)</span>
-                    <span>₹{driverBetaTotal.toFixed(2)}</span>
-                  </div>
-                )}
-                {enableNightHalt && nightHaltTotal > 0 && (
-                  <div className="flex justify-between text-slate-400">
-                    <span>Night Halt ({nightHaltDays}d)</span>
-                    <span>₹{nightHaltTotal.toFixed(2)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between font-medium pt-2 text-white">
-                  <span>Subtotal</span>
-                  <span>₹{subtotal.toFixed(2)}</span>
+
+                <div className="space-y-3 py-2">
+                    <div className="flex justify-between text-sm font-bold text-white">
+                        <span className="uppercase tracking-tight">Subtotal</span>
+                        <span>₹ {subtotal.toLocaleString()}</span>
+                    </div>
+
+                    {enableDiscount && (
+                        <div className="flex justify-between text-emerald-400 text-xs font-bold">
+                            <span className="uppercase tracking-tight">Cash Discount</span>
+                            <span>- ₹ {discountAmount.toLocaleString()}</span>
+                        </div>
+                    )}
+                    
+                    {enableGst && (
+                        <div className="flex justify-between text-slate-400 text-xs font-bold">
+                            <span className="uppercase tracking-tight">GST ({gstPercentage}%)</span>
+                            <span>₹ {gstAmount.toLocaleString()}</span>
+                        </div>
+                    )}
+                    {enableIgst && (
+                        <div className="flex justify-between text-slate-400 text-xs font-bold">
+                            <span className="uppercase tracking-tight">IGST ({igstPercentage}%)</span>
+                            <span>₹ {igstAmount.toLocaleString()}</span>
+                        </div>
+                    )}
+                    {advance > 0 && (
+                        <div className="flex justify-between text-orange-400 text-xs font-bold">
+                            <span className="uppercase tracking-tight">Token Advance</span>
+                            <span>- ₹ {advance.toLocaleString()}</span>
+                        </div>
+                    )}
                 </div>
-                {enableDiscount && (
-                  <div className="flex justify-between text-green-400">
-                    <span>Discount</span>
-                    <span>-₹{discountAmount.toFixed(2)}</span>
-                  </div>
-                )}
+
+                <div className="pt-6 border-t border-slate-800">
+                    <div className="bg-slate-800/50 p-4 rounded border border-slate-700">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Total Receivable</p>
+                        <p className="text-3xl font-bold tracking-tight">₹ {totalBill.toLocaleString()}</p>
+                    </div>
+                </div>
+
+                <div className="pt-6 space-y-3">
+                    <button
+                        onClick={handlePreviewInvoice}
+                        disabled={uploading || driveLoading}
+                        className="w-full py-3 bg-white text-slate-900 rounded font-bold text-xs uppercase tracking-widest hover:bg-slate-100 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                    >
+                        <Eye size={16} />
+                        Preview Bill
+                    </button>
+                    <button
+                        onClick={handleGenerateInvoice}
+                        disabled={uploading || driveLoading}
+                        className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-900/40 disabled:opacity-50"
+                    >
+                        {uploading || driveLoading ? (
+                            <>
+                                <Loader2 size={18} className="animate-spin" />
+                                {isSignedIn ? 'Processing...' : 'Syncing...'}
+                            </>
+                        ) : (
+                            <>
+                                <Printer size={18} />
+                                Generate & Sync
+                            </>
+                        )}
+                    </button>
+                </div>
               </div>
-
-              <div className="space-y-3 pb-6">
-                {enableGst && (
-                  <div className="flex justify-between text-slate-300 text-sm">
-                    <span>GST ({gstPercentage}%)</span>
-                    <span>₹{gstAmount.toFixed(2)}</span>
-                  </div>
-                )}
-                {enableIgst && (
-                  <div className="flex justify-between text-slate-300 text-sm">
-                    <span>IGST ({igstPercentage}%)</span>
-                    <span>₹{igstAmount.toFixed(2)}</span>
-                  </div>
-                )}
-                {advance > 0 && (
-                  <div className="flex justify-between text-amber-400 text-sm">
-                    <span>Advance</span>
-                    <span>-₹{advance.toFixed(2)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-2xl font-bold">
-                  <span>Total</span>
-                  <span>₹{(grandTotal - advance).toFixed(2)}</span>
-                </div>
-              </div>
-
-              <button
-                onClick={handlePreviewInvoice}
-                disabled={uploading || driveLoading}
-                className="w-full bg-slate-700 hover:bg-slate-600 disabled:bg-slate-500 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition-colors mb-3"
-              >
-                <Eye size={20} />
-                Preview Invoice
-              </button>
-
-              <button
-                onClick={handleGenerateInvoice}
-                disabled={uploading || driveLoading}
-                className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
-              >
-                {uploading || driveLoading ? (
-                  <>
-                    <Loader2 size={20} className="animate-spin" />
-                    {isSignedIn ? 'Uploading Invoice...' : 'Signing in...'}
-                  </>
-                ) : (
-                  <>
-                    <Printer size={20} />
-                    Generate Invoice
-                  </>
-                )}
-              </button>
             </div>
           </div>
         </div>

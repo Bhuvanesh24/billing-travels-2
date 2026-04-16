@@ -224,7 +224,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   if (data.customerCompanyName) {
     doc.text('Company', labelX, currentY);
     doc.text(':', colonX, currentY);
-    const companyLines = doc.splitTextToSize(data.customerCompanyName, 80);
+    const companyLines = doc.splitTextToSize(data.customerCompanyName, 75);
     doc.text(companyLines, valueX, currentY);
     currentY += lineHeight * companyLines.length;
   }
@@ -233,7 +233,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
     doc.text('Address', labelX, currentY);
     doc.text(':', colonX, currentY);
     // Split address into lines if too long - extend to right column boundary
-    const addressLines = doc.splitTextToSize(data.customerAddress, 80);
+    const addressLines = doc.splitTextToSize(data.customerAddress, 75);
     doc.text(addressLines, valueX, currentY);
     currentY += (lineHeight * addressLines.length);
   }

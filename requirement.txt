@@ -1,0 +1,6 @@
+The Ui should be neat and clean.
+1. Remove the New Trip/Invoice from the sidebar.
+2. In invoices page , the total bill is not correctly showing , inside the invoice pdf it is correct . So whenever the trip is ended like the invoice is calculating the total amount right , so add a new attribute to the trip and invoice table . Such that it will be easy to show in frontend.
+The car expense history is showing error fix that also.
+Total bill amount wrong.
+View invoice is also coming with error.

@@ -50,7 +50,7 @@ export default function Login() {
 
                 {/* Login Card */}
                 <div
-                    className={`bg-white rounded-xl border border-slate-200 shadow-lg p-8 transition-transform ${shaking ? 'animate-shake' : ''}`}
+                    className={`bg-white rounded-2xl border border-slate-200 shadow-sm p-8 transition-transform ${shaking ? 'animate-shake' : ''}`}
                 >
                     <div className="flex justify-center mb-6">
                         <div

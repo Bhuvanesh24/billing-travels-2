@@ -28,11 +28,12 @@ export const carExpenseService = {
   async getExpensesByCar(carId: string) {
     const q = query(
       collection(db, COLLECTION_NAME), 
-      where('carId', '==', carId),
-      orderBy('date', 'desc')
+      where('carId', '==', carId)
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as CarExpense));
+    return snap.docs
+      .map(d => ({ id: d.id, ...d.data() } as CarExpense))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   },
 
   async getAllExpenses() {

@@ -14,12 +14,16 @@ import {
   Banknote,
   Smartphone,
   Building2,
-  Edit2
+  Edit2,
+  MapPin,
+  ArrowRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useDrive } from '../services/useDrive';
 import { db, deleteInvoiceMetadata } from '../services/firestore';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { Pagination } from '../components/Pagination';
+import { tripService, type Trip } from '../services/tripService';
 
 interface InvoiceMetadata {
   id: string;
@@ -29,12 +33,15 @@ interface InvoiceMetadata {
   grandTotal?: number;
   totalAmount?: number;
   total?: number;
+  totalBill?: number;
+  driveFileId?: string;
   paymentStatus: 'pending' | 'paid';
   createdAt: string;
   customerCompanyName?: string;
   paymentMode?: string;
   paymentDate?: string;
   amountReceived?: number;
+  tripId?: string | null;
 }
 
 const PAYMENT_MODES = [
@@ -58,9 +65,13 @@ export default function InvoiceList() {
   const [amountReceived, setAmountReceived] = useState('');
   const [savingPayment, setSavingPayment] = useState(false);
 
-  // Helper: check all possible field names — Drive file ID is the document ID (inv.id)
+  // Ready for Invoicing trips
+  const [pendingTrips, setPendingTrips] = useState<Trip[]>([]);
+  const [showLegacy, setShowLegacy] = useState(false);
+
+  // Helper: check all possible field names
   const getAmount = (inv: any) =>
-    inv.grandTotal ?? inv.totalAmount ?? inv.total ?? 0;
+    inv.totalBill ?? inv.grandTotal ?? inv.totalAmount ?? inv.total ?? 0;
 
   useEffect(() => {
     fetchInvoices();
@@ -69,16 +80,17 @@ export default function InvoiceList() {
   async function fetchInvoices() {
     try {
       setLoading(true);
-      const snap = await getDocs(collection(db, 'invoices'));
-      const data = snap.docs
+      const [invoiceSnap, trips] = await Promise.all([
+        getDocs(collection(db, 'invoices')),
+        tripService.getCompletedTripsWithoutInvoice()
+      ]);
+
+      const data = invoiceSnap.docs
         .map(d => ({ id: d.id, ...d.data() } as InvoiceMetadata))
         .sort((a, b) => new Date((b as any).createdAt).getTime() - new Date((a as any).createdAt).getTime());
-      // DEBUG: log the first invoice's keys so we can see what field names exist
-      if (data.length > 0) {
-        console.log('🧾 Invoice field names:', Object.keys(data[0]));
-        console.log('🧾 First invoice data:', data[0]);
-      }
+      
       setInvoices(data);
+      setPendingTrips(trips);
     } catch (error) {
       console.error(error);
       toast.error('Failed to load invoices');
@@ -146,13 +158,28 @@ export default function InvoiceList() {
     }
   };
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
   const filteredInvoices = invoices.filter(inv => {
     const matchesSearch =
       inv.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       inv.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterStatus === 'all' || inv.paymentStatus === filterStatus;
-    return matchesSearch && matchesFilter;
+    const matchesSource = showLegacy || (inv.tripId !== undefined && inv.tripId !== null);
+    return matchesSearch && matchesFilter && matchesSource;
   });
+
+  const totalPages = Math.ceil(filteredInvoices.length / pageSize);
+  const paginatedInvoices = filteredInvoices.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  // Reset to first page when searching or filtering
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterStatus]);
 
   const totalPending = invoices
     .filter(i => i.paymentStatus === 'pending')
@@ -163,7 +190,7 @@ export default function InvoiceList() {
     .reduce((sum, i) => sum + getAmount(i), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
         <div>
@@ -211,13 +238,62 @@ export default function InvoiceList() {
                   : 'text-slate-500 hover:text-slate-700'
                 }`}
             >
-              {status === 'all' ? `All (${invoices.length})` :
-                status === 'pending' ? `Pending (${invoices.filter(i => i.paymentStatus === 'pending').length})` :
-                  `Paid (${invoices.filter(i => i.paymentStatus === 'paid').length})`}
+              {status === 'all' ? `All (${invoices.filter(i => showLegacy || (i.tripId !== undefined && i.tripId !== null)).length})` :
+                status === 'pending' ? `Pending (${invoices.filter(i => i.paymentStatus === 'pending' && (showLegacy || (i.tripId !== undefined && i.tripId !== null))).length})` :
+                  `Paid (${invoices.filter(i => i.paymentStatus === 'paid' && (showLegacy || (i.tripId !== undefined && i.tripId !== null))).length})`}
             </button>
           ))}
         </div>
+        <button
+          onClick={() => setShowLegacy(!showLegacy)}
+          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${showLegacy ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-200'}`}
+        >
+          {showLegacy ? 'Trip-Only Mode' : 'Show All History'}
+        </button>
       </div>
+
+      {/* Ready for Invoicing Section */}
+      {!loading && pendingTrips.length > 0 && (
+        <div className="bg-blue-50/50 rounded-[2rem] border border-blue-100 p-8 space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
+                <Clock size={20} />
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-slate-900 leading-tight">Ready for Invoicing</h2>
+                <p className="text-xs text-blue-600 font-bold uppercase tracking-wider">Completed journeys pending settlement</p>
+              </div>
+            </div>
+            <span className="bg-blue-600 text-white text-[10px] font-black px-3 py-1 rounded-full">{pendingTrips.length} Trips</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {pendingTrips.map((trip) => (
+              <div key={trip.id} className="bg-white p-5 rounded-2xl border border-blue-100 shadow-sm hover:shadow-md transition-all group">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-sm leading-tight">{trip.customerName}</h3>
+                    <p className="text-[10px] text-slate-500 font-medium">{trip.vehicleNo} • {trip.driverName}</p>
+                  </div>
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                    <MapPin size={16} />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between pt-3 border-t border-slate-50">
+                   <p className="text-[10px] text-slate-400 font-bold">{new Date(trip.completedAt || trip.startTime).toLocaleDateString()}</p>
+                   <Link 
+                    to={`/create?tripId=${trip.id}`}
+                    className="flex items-center gap-1.5 text-blue-600 font-black text-[10px] uppercase tracking-widest hover:gap-2 transition-all"
+                   >
+                     Bill Now <ArrowRight size={12} />
+                   </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Invoice Grid */}
       {loading ? (
@@ -225,9 +301,10 @@ export default function InvoiceList() {
           <Loader2 className="animate-spin text-blue-600 mb-4" size={40} />
           <p className="text-slate-500 font-medium tracking-wide">Loading invoices...</p>
         </div>
-      ) : filteredInvoices.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredInvoices.map((inv) => (
+      ) : paginatedInvoices.length > 0 ? (
+        <div className="space-y-6 flex flex-col">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {paginatedInvoices.map((inv) => (
             <div key={inv.id} className="bg-white rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden">
               <div className="p-6">
                 <div className="flex justify-between items-start mb-5">
@@ -235,10 +312,10 @@ export default function InvoiceList() {
                     {inv.paymentStatus === 'paid' ? <CheckCircle2 size={20} /> : <Clock size={20} />}
                   </div>
                   <div className="flex gap-1">
-                    {/* View Invoice PDF in Drive (Drive file ID = document ID) */}
-                    {isSignedIn && (
+                    {/* View Invoice PDF in Drive */}
+                    {isSignedIn && inv.driveFileId && (
                       <a
-                        href={`https://drive.google.com/file/d/${inv.id}/view`}
+                        href={`https://drive.google.com/file/d/${inv.driveFileId}/view`}
                         target="_blank"
                         rel="noreferrer"
                         title="View Invoice PDF"
@@ -305,7 +382,15 @@ export default function InvoiceList() {
                 </div>
               </div>
             </div>
-          ))}
+            ))}
+          </div>
+          <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            totalItems={filteredInvoices.length}
+            pageSize={pageSize}
+          />
         </div>
       ) : (
         <div className="bg-white rounded-[2.5rem] border border-slate-100 p-24 text-center">
@@ -317,44 +402,45 @@ export default function InvoiceList() {
         </div>
       )}
 
-      {/* Payment Modal */}
       {payingInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden">
-            <div className="bg-slate-900 p-6 text-white">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">Collecting Payment</p>
-                  <h2 className="text-xl font-black">{payingInvoice.customerName}</h2>
-                  <p className="text-slate-400 text-sm">{payingInvoice.invoiceNumber}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-sm rounded-lg shadow-xl overflow-hidden border border-slate-200">
+            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white">
+                  <CreditCard size={18} />
                 </div>
-                <button
-                  onClick={() => setPayingInvoice(null)}
-                  className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors"
-                >
-                  <X size={20} />
-                </button>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-800 leading-tight">Record Payment</h2>
+                  <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{payingInvoice.invoiceNumber}</p>
+                </div>
               </div>
-              <div className="mt-4 pt-4 border-t border-white/10">
-                <p className="text-slate-400 text-xs uppercase tracking-widest">Invoice Total</p>
-                <p className="text-3xl font-black">₹ {getAmount(payingInvoice).toLocaleString()}</p>
-              </div>
+              <button onClick={() => setPayingInvoice(null)} className="text-slate-400 hover:bg-slate-100 p-1.5 rounded transition-colors border border-transparent hover:border-slate-200">
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div className="p-6 pb-0">
+               <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 shadow-sm mb-4">
+                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">Total Billable</p>
+                  <p className="text-2xl font-bold text-slate-900">₹ {getAmount(payingInvoice).toLocaleString()}</p>
+               </div>
             </div>
 
             <div className="p-6 space-y-5">
               <div>
-                <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Payment Mode</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Payment Mode</p>
                 <div className="grid grid-cols-2 gap-2">
                   {PAYMENT_MODES.map(({ id, label, icon: Icon }) => (
                     <button
                       key={id}
                       onClick={() => setPaymentMode(id)}
-                      className={`flex items-center gap-2 px-4 py-3 rounded-xl border-2 text-sm font-bold transition-all ${paymentMode === id
-                          ? 'border-slate-900 bg-slate-900 text-white'
-                          : 'border-slate-100 bg-slate-50 text-slate-600 hover:border-slate-300'
+                      className={`flex items-center gap-2 px-3 py-2 rounded border text-xs font-bold transition-all shadow-sm ${paymentMode === id
+                          ? 'bg-slate-900 border-slate-900 text-white'
+                          : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
                         }`}
                     >
-                      <Icon size={16} />
+                      <Icon size={14} />
                       {label}
                     </button>
                   ))}
@@ -362,23 +448,25 @@ export default function InvoiceList() {
               </div>
 
               <div>
-                <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Amount Received (₹)</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Amount Received (₹)</p>
                 <input
                   type="number"
-                  className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold text-slate-900 outline-none focus:border-slate-900 transition-all text-lg"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md font-bold text-slate-900 outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all text-lg shadow-sm"
                   value={amountReceived}
                   onChange={(e) => setAmountReceived(e.target.value)}
                 />
               </div>
 
-              <button
-                onClick={handleMarkPaid}
-                disabled={savingPayment || !amountReceived}
-                className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-2xl font-black text-base transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-100"
-              >
-                {savingPayment ? <Loader2 size={20} className="animate-spin" /> : <CheckCircle2 size={20} />}
-                Confirm Payment
-              </button>
+              <div className="pt-2">
+                <button
+                  onClick={handleMarkPaid}
+                  disabled={savingPayment || !amountReceived}
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-100 disabled:text-slate-400 text-white rounded font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
+                >
+                  {savingPayment ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                  Confirm Settlement
+                </button>
+              </div>
             </div>
           </div>
         </div>

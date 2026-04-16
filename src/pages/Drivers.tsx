@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Edit2, Trash2, Phone, User as UserIcon, Calendar, Loader2, X, TrendingUp, FileText, IndianRupee } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, User as UserIcon, Loader2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { masterService, type Driver } from '../services/masterService';
 import { db } from '../services/firestore';
 import { collection, getDocs } from 'firebase/firestore';
+import { Pagination } from '../components/Pagination';
 
 interface DriverMetric {
   driverId: string;
@@ -18,6 +19,8 @@ export default function Drivers() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
   const [metrics, setMetrics] = useState<Record<string, DriverMetric>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   const [formData, setFormData] = useState<Omit<Driver, 'id' | 'createdAt'>>({
     name: '', phone: '', license: '', address: '', status: 'active'
@@ -103,8 +106,19 @@ export default function Drivers() {
     d.license.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const totalPages = Math.ceil(filteredDrivers.length / pageSize);
+  const paginatedDrivers = filteredDrivers.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  // Reset to first page when searching
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   return (
-    <div className="space-y-6">
+    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -139,86 +153,85 @@ export default function Drivers() {
         </div>
       </div>
 
-      {/* Drivers Grid */}
+      {/* Drivers Table */}
       {loading ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-20 flex flex-col items-center justify-center">
+        <div className="bg-white rounded-lg border border-slate-200 p-20 flex flex-col items-center justify-center">
           <Loader2 className="animate-spin text-blue-600 mb-4" size={40} />
           <p className="text-slate-500 font-medium">Fetching drivers...</p>
         </div>
       ) : filteredDrivers.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredDrivers.map((driver) => {
-            const m = metrics[driver.name];
-            return (
-              <div key={driver.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group overflow-hidden">
-                <div className="p-5">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                      <UserIcon size={24} />
-                    </div>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => handleOpenModal(driver)}
-                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                      >
-                        <Edit2 size={15} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(driver.id!)}
-                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1 mb-4">
-                    <h3 className="font-bold text-slate-900 text-lg leading-tight">{driver.name}</h3>
-                    <div className="flex items-center gap-2 text-sm text-slate-500">
-                      <Phone size={13} className="text-slate-400" />
-                      <span>{driver.phone}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                      <FileText size={13} className="text-slate-400" />
-                      <span className="font-mono">{driver.license}</span>
-                    </div>
-                  </div>
-
-                  {/* Metrics bar */}
-                  <div className="bg-slate-50 rounded-xl p-4 grid grid-cols-2 gap-4 border border-slate-100">
-                    <div>
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Total Trips</p>
-                      <div className="flex items-center gap-1">
-                        <TrendingUp size={12} className="text-blue-500" />
-                        <p className="text-base font-black text-slate-900">{m?.totalTrips || 0}</p>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Revenue</p>
-                      <div className="flex items-center gap-1">
-                        <IndianRupee size={12} className="text-emerald-500" />
-                        <p className="text-base font-black text-emerald-700">{(m?.totalRevenue || 0).toLocaleString()}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-50">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${driver.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
-                      {driver.status}
-                    </span>
-                    <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                      <Calendar size={10} />
-                      <span>{driver.createdAt ? new Date(driver.createdAt).toLocaleDateString() : 'N/A'}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+        <div className="bg-white border text-sm border-slate-200 rounded-lg shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                  <th className="px-4 py-3 font-semibold uppercase text-[10px] tracking-wider">Driver Details</th>
+                  <th className="px-4 py-3 font-semibold uppercase text-[10px] tracking-wider">Contact & License</th>
+                  <th className="px-4 py-3 font-semibold uppercase text-[10px] tracking-wider text-center">Performance Stats</th>
+                  <th className="px-4 py-3 font-semibold uppercase text-[10px] tracking-wider">Status</th>
+                  <th className="px-4 py-3 font-semibold uppercase text-[10px] tracking-wider text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {paginatedDrivers.map((driver) => {
+                  const m = metrics[driver.name];
+                  return (
+                    <tr key={driver.id} className="hover:bg-slate-50 transition-colors group">
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-slate-800">{driver.name}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Joined: {driver.createdAt ? new Date(driver.createdAt).toLocaleDateString() : 'N/A'}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-slate-700">{driver.phone}</span>
+                          <span className="text-xs text-slate-500 font-mono">{driver.license}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-4">
+                          <div className="text-center">
+                            <p className="text-[9px] text-slate-400 font-semibold uppercase">Trips</p>
+                            <p className="font-bold text-slate-800">{m?.totalTrips || 0}</p>
+                          </div>
+                          <div className="w-px h-6 bg-slate-200"></div>
+                          <div className="text-center">
+                            <p className="text-[9px] text-slate-400 font-semibold uppercase">Revenue</p>
+                            <p className="font-bold text-emerald-600">₹{(m?.totalRevenue || 0).toLocaleString()}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2.5 py-1 rounded-sm text-[10px] font-bold uppercase tracking-wider ${driver.status === 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
+                          {driver.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2 transition-opacity">
+                          <button onClick={() => handleOpenModal(driver)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Edit">
+                            <Edit2 size={14} />
+                          </button>
+                          <button onClick={() => handleDelete(driver.id!)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            totalItems={filteredDrivers.length}
+            pageSize={pageSize}
+          />
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 p-16 text-center">
-          <UserIcon size={48} className="mx-auto mb-4 text-slate-200" />
+        <div className="bg-white rounded-xl border border-slate-200 p-16 text-center shadow-sm">
+          <UserIcon size={40} className="mx-auto mb-4 text-slate-200" />
           <h3 className="text-lg font-bold text-slate-900 mb-1">No drivers found</h3>
           <p className="text-slate-500 text-sm mb-5">Add your first driver to start tracking performance.</p>
           <button onClick={() => handleOpenModal()} className="text-blue-600 font-semibold hover:underline inline-flex items-center gap-1">
@@ -230,54 +243,64 @@ export default function Drivers() {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <h2 className="font-bold text-slate-900">{editingDriver ? 'Edit Driver' : 'Add New Driver'}</h2>
-              <button onClick={() => setIsModalOpen(false)} className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-500 transition-colors">
+          <div className="bg-white w-full max-w-md rounded-lg shadow-xl overflow-hidden border border-slate-200">
+            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white">
+                  <UserIcon size={18} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-800 leading-tight">{editingDriver ? 'Edit Operator' : 'Add New Driver'}</h2>
+                  <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Staff Registry</p>
+                </div>
+              </div>
+              <button onClick={() => setIsModalOpen(false)} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 border border-transparent hover:border-slate-200 transition-colors">
                 <X size={18} />
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Driver Full Name</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Driver Full Name</label>
                 <input type="text" required placeholder="e.g. Rahul Sharma"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm font-semibold shadow-sm"
                   value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Phone</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Phone</label>
                   <input type="tel" required placeholder="+91 98..."
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm font-semibold shadow-sm"
                     value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">License No.</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">License No.</label>
                   <input type="text" required placeholder="DL-XXXXXXXX"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm font-bold shadow-sm"
                     value={formData.license} onChange={(e) => setFormData({ ...formData, license: e.target.value })} />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Address</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Full Address</label>
                 <textarea rows={2} placeholder="Street, City, Pin..."
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium resize-none shadow-sm"
                   value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Status</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Employment Status</label>
                 <div className="flex gap-2">
                   {(['active', 'inactive'] as const).map((s) => (
                     <button key={s} type="button" onClick={() => setFormData({ ...formData, status: s })}
-                      className={`flex-1 py-2 rounded-xl text-sm font-bold capitalize border transition-all ${formData.status === s ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400'}`}>
+                      className={`flex-1 py-1.5 rounded text-[10px] font-bold uppercase border transition-all ${formData.status === s ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}>
                       {s}
                     </button>
                   ))}
                 </div>
               </div>
-              <button type="submit" className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg transition-all mt-2">
-                {editingDriver ? 'Save Changes' : 'Create Driver'}
-              </button>
+               <div className="pt-2">
+                <button type="submit" className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold transition-all shadow-sm">
+                  {editingDriver ? 'Save Operator Changes' : 'Register Operator'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
