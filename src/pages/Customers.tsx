@@ -43,11 +43,8 @@ export default function Customers() {
 
   // Form State
   const [formData, setFormData] = useState<Omit<Customer, 'id' | 'createdAt'>>({
-    name: '',
     companyName: 'M/S ',
     address: '',
-    phone: '',
-    email: '',
     gstNo: ''
   });
 
@@ -72,21 +69,15 @@ export default function Customers() {
     if (customer) {
       setEditingCustomer(customer);
       setFormData({
-        name: customer.name,
         companyName: customer.companyName,
         address: customer.address,
-        phone: customer.phone,
-        email: customer.email,
         gstNo: customer.gstNo
       });
     } else {
       setEditingCustomer(null);
       setFormData({
-        name: '',
         companyName: 'M/S ',
         address: '',
-        phone: '',
-        email: '',
         gstNo: ''
       });
     }
@@ -129,10 +120,10 @@ export default function Customers() {
     setLoadingInvoices(true);
     try {
       // Query invoices for this customer
-      // Note: We're searching by customerName which is saved in metadata
+      // Note: We're searching by customerCompanyName to group all company bills
       const q = query(
         collection(db, 'invoices'),
-        where('customerName', '==', customer.name)
+        where('customerCompanyName', '==', customer.companyName)
       );
       const snap = await getDocs(q);
       const invoices = snap.docs
@@ -179,7 +170,6 @@ export default function Customers() {
   const pageSize = 10;
 
   const filteredCustomers = customers.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.companyName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -202,15 +192,15 @@ export default function Customers() {
     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Customers (CRM)</h1>
-          <p className="text-slate-500 text-sm">Manage client relationships and billing history</p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Companies (CRM)</h1>
+          <p className="text-slate-500 text-sm">Manage corporate clients and billing history</p>
         </div>
         <button 
           onClick={() => handleOpenModal()}
           className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shadow-md hover:shadow-lg flex items-center gap-2"
         >
           <Plus size={18} />
-          Add Customer
+          Add Company
         </button>
       </div>
 
@@ -220,7 +210,7 @@ export default function Customers() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input 
             type="text"
-            placeholder="Search by name or company..."
+            placeholder="Search by company name..."
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -232,7 +222,7 @@ export default function Customers() {
       {loading ? (
         <div className="flex flex-col items-center justify-center p-20 bg-white rounded-lg border border-slate-200">
           <Loader2 className="animate-spin text-blue-600 mb-4" size={32} />
-          <p className="text-slate-500 font-medium">Loading customers...</p>
+          <p className="text-slate-500 font-medium">Loading companies...</p>
         </div>
       ) : filteredCustomers.length > 0 ? (
         <div className="bg-white border text-sm border-slate-200 rounded-lg shadow-sm overflow-hidden">
@@ -240,8 +230,8 @@ export default function Customers() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                  <th className="px-4 py-3 font-semibold uppercase text-[10px] tracking-wider">Company Details</th>
-                  <th className="px-4 py-3 font-semibold uppercase text-[10px] tracking-wider">Contact Info</th>
+                  <th className="px-4 py-3 font-semibold uppercase text-[10px] tracking-wider">Company Name</th>
+                  <th className="px-4 py-3 font-semibold uppercase text-[10px] tracking-wider">Billing Address</th>
                   <th className="px-4 py-3 font-semibold uppercase text-[10px] tracking-wider">GST No</th>
                   <th className="px-4 py-3 font-semibold uppercase text-[10px] tracking-wider text-right">Actions</th>
                 </tr>
@@ -251,13 +241,11 @@ export default function Customers() {
                   <tr key={customer.id} className="hover:bg-slate-50 transition-colors group">
                     <td className="px-4 py-3">
                       <p className="font-semibold text-slate-800">{customer.companyName}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">{customer.name}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-slate-700">{customer.phone}</span>
-                        {customer.email && <span className="text-xs text-slate-500">{customer.email}</span>}
-                      </div>
+                      <p className="text-sm text-slate-600 line-clamp-2" title={customer.address}>
+                        {customer.address || <span className="text-slate-400 italic text-xs">No address</span>}
+                      </p>
                     </td>
                     <td className="px-4 py-3">
                       {customer.gstNo ? (
@@ -301,7 +289,7 @@ export default function Customers() {
       ) : (
         <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-16 text-center">
           <Users size={40} className="mx-auto mb-3 text-slate-200" />
-          <p className="text-slate-500 font-medium">No customers matched your search.</p>
+          <p className="text-slate-500 font-medium">No companies matched your search.</p>
         </div>
       )}
 
@@ -314,7 +302,7 @@ export default function Customers() {
                   <Plus size={18} />
                 </div>
                 <div>
-                  <h2 className="text-sm font-bold text-slate-800 leading-tight">{editingCustomer ? 'Update Profile' : 'New Customer'}</h2>
+                  <h2 className="text-sm font-bold text-slate-800 leading-tight">{editingCustomer ? 'Update Profile' : 'New Company'}</h2>
                   <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">CRM Registry</p>
                 </div>
               </div>
@@ -323,7 +311,7 @@ export default function Customers() {
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Company Name</label>
                   <input 
@@ -331,36 +319,6 @@ export default function Customers() {
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm font-semibold shadow-sm"
                     value={formData.companyName}
                     onChange={(e) => setFormData({...formData, companyName: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Contact Person</label>
-                  <input 
-                    type="text" placeholder="name"
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm font-semibold shadow-sm"
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Phone Number</label>
-                  <input 
-                    type="tel" placeholder="+91 ..."
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm font-semibold shadow-sm"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Email Address</label>
-                  <input 
-                    type="email" placeholder="client@example.com"
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm font-semibold shadow-sm"
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
                   />
                 </div>
               </div>
@@ -388,7 +346,7 @@ export default function Customers() {
               <div className="pt-2">
                 <button type="submit" className="w-full py-2.5 bg-slate-900 text-white rounded font-bold shadow-sm hover:bg-black transition-all flex items-center justify-center gap-2">
                   <CheckCircle2 size={18} />
-                  {editingCustomer ? 'Update Profile' : 'Register Customer'}
+                  {editingCustomer ? 'Update Profile' : 'Register Company'}
                 </button>
               </div>
             </form>

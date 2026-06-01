@@ -33,11 +33,11 @@ export interface Car {
 
 export interface Customer {
   id?: string;
-  name: string;
+  name?: string;
   companyName: string;
   address: string;
-  phone: string;
-  email: string;
+  phone?: string;
+  email?: string;
   gstNo: string;
   createdAt?: string;
 }
@@ -92,8 +92,10 @@ export const masterService = {
 
   // --- Customers ---
   async getCustomers() {
-    const q = query(collection(db, COLLECTIONS.CUSTOMERS), orderBy('name'));
-    const snap = await getDocs(q);
+    console.log('🔍 Fetching customers from collection:', COLLECTIONS.CUSTOMERS);
+    const snap = await getDocs(collection(db, COLLECTIONS.CUSTOMERS));
+    console.log('📦 Customers fetched:', snap.size, 'documents');
+    snap.docs.forEach(d => console.log('  →', d.id, d.data()));
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as Customer));
   },
   async addCustomer(data: Customer) {

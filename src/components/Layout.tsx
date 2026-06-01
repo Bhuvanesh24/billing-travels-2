@@ -54,7 +54,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { to: '/', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
     { to: '/trips', icon: <MapPin size={20} />, label: 'Trips' },
     { to: '/invoices', icon: <FileText size={20} />, label: 'Invoices' },
-    { to: '/customers', icon: <Users size={20} />, label: 'Customers' },
+    { to: '/customers', icon: <Users size={20} />, label: 'Companies' },
     { to: '/drivers', icon: <UserSquare2 size={20} />, label: 'Drivers' },
     { to: '/cars', icon: <Car size={20} />, label: 'Cars' },
     { to: '/accounts', icon: <IndianRupee size={20} />, label: 'Accounts' },

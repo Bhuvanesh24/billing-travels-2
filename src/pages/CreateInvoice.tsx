@@ -125,6 +125,7 @@ export default function CreateInvoice() {
   const [customerCompanyName, setCustomerCompanyName] = useState('M/S ');
   const [customerAddress, setCustomerAddress] = useState('');
   const [customerGstNo, setCustomerGstNo] = useState('');
+  const [bookingReference, setBookingReference] = useState('');
   const [driverName, setDriverName] = useState('');
   const [vehicleNo, setVehicleNo] = useState('');
   const [vehicleType, setVehicleType] = useState('');
@@ -147,6 +148,8 @@ export default function CreateInvoice() {
   const [ratePerKm, setRatePerKm] = useState(0);
   const [chargePerKmFixed, setChargePerKmFixed] = useState(0);
   const [chargePerKmHour, setChargePerKmHour] = useState(0);
+  const [extraHours, setExtraHours] = useState(0);
+  const [extraHourRate, setExtraHourRate] = useState(0);
 
   // Additional Costs
   const [additionalCosts, setAdditionalCosts] = useState<AdditionalCost[]>([]);
@@ -157,6 +160,7 @@ export default function CreateInvoice() {
   const [enableDriverBeta, setEnableDriverBeta] = useState(false);
   const [driverBetaDays, setDriverBetaDays] = useState(0);
   const [driverBetaAmountPerDay, setDriverBetaAmountPerDay] = useState(0);
+  const [enableExtraHours, setEnableExtraHours] = useState(false);
   const [enableNightHalt, setEnableNightHalt] = useState(false);
   const [nightHaltDays, setNightHaltDays] = useState(0);
   const [nightHaltAmountPerDay, setNightHaltAmountPerDay] = useState(0);
@@ -179,6 +183,7 @@ export default function CreateInvoice() {
             setCustomerCompanyName(data.customerCompanyName || 'M/S ');
             setCustomerAddress(data.customerAddress || '');
             setCustomerGstNo(data.customerGstNo || '');
+            setBookingReference(data.bookingReference || '');
             setDriverName(data.driverName || '');
             setVehicleNo(data.vehicleNo || '');
             setVehicleType(data.vehicleType || '');
@@ -199,7 +204,10 @@ export default function CreateInvoice() {
             setRatePerKm(data.ratePerKm || 0);
             setChargePerKmFixed(data.chargePerKmFixed || 0);
             setChargePerKmHour(data.chargePerKmHour || 0);
+            setExtraHours(data.extraHours || 0);
+            setExtraHourRate(data.extraHourRate || 0);
             setAdditionalCosts(data.additionalCosts || []);
+            setEnableExtraHours(data.enableExtraHours || false);
             setEnableDriverBeta(data.enableDriverBeta || false);
             setDriverBetaDays(data.driverBetaDays || 0);
             setDriverBetaAmountPerDay(data.driverBetaAmountPerDay || 0);
@@ -291,18 +299,25 @@ export default function CreateInvoice() {
   const chargeableKm = Math.max(0, totalKm - freeKm);
 
   const rentTotal = (() => {
+    let total = 0;
     switch (rentType) {
       case 'fixed':
-        return fixedAmount + (chargeableKm * chargePerKmFixed);
+        total = fixedAmount + (chargeableKm * chargePerKmFixed);
+        break;
       case 'hour':
-        return (hours * ratePerHour) + (chargeableKm * chargePerKmHour);
+        total = (hours * ratePerHour) + (chargeableKm * chargePerKmHour);
+        break;
       case 'day':
-        return (days * ratePerDay) + (chargeableKm * fuelChargePerKm);
+        total = (days * ratePerDay) + (chargeableKm * fuelChargePerKm);
+        break;
       case 'km':
-        return chargeableKm * ratePerKm;
-      default:
-        return 0;
+        total = chargeableKm * ratePerKm;
+        break;
     }
+    if (enableExtraHours) {
+      total += (extraHours * extraHourRate);
+    }
+    return total;
   })();
 
   // Calculate Driver Beta and Night Halt totals
@@ -380,6 +395,7 @@ export default function CreateInvoice() {
         customerCompanyName,
         customerAddress,
         customerGstNo,
+        bookingReference,
         driverName,
         vehicleNo,
         vehicleType,
@@ -419,7 +435,10 @@ export default function CreateInvoice() {
         igstAmount,
         advance,
         grandTotal,
-        totalBill
+        totalBill,
+        enableExtraHours,
+        extraHours,
+        extraHourRate
       };
 
       const { blob } = await generateInvoicePDF(invoiceData);
@@ -514,6 +533,9 @@ export default function CreateInvoice() {
           advance,
           grandTotal,
           totalAmount: grandTotal,  // always save both for compatibility
+          enableExtraHours,
+          extraHours,
+          extraHourRate,
           totalBill,
         };
 
@@ -684,6 +706,16 @@ export default function CreateInvoice() {
                     placeholder="e.g. 22AAAAA0000A1Z5"
                     value={customerGstNo}
                     onChange={e => setCustomerGstNo(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Booking Reference</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm font-semibold shadow-sm"
+                    placeholder="e.g. Booked by Rajesh"
+                    value={bookingReference}
+                    onChange={e => setBookingReference(e.target.value)}
                   />
                 </div>
               </div>
@@ -860,15 +892,6 @@ export default function CreateInvoice() {
                       placeholder="0.00"
                       value={chargePerKmFixed || ''}
                       onChange={e => setChargePerKmFixed(Number(e.target.value))}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Chargeable KM</label>
-                    <input
-                      type="text"
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-100"
-                      value={chargeableKm}
-                      disabled
                     />
                   </div>
                 </div>
@@ -1060,6 +1083,35 @@ export default function CreateInvoice() {
                       className="flex-1 sm:w-24 px-3 py-1.5 border border-slate-300 rounded text-xs font-bold shadow-sm"
                       value={nightHaltAmountPerDay || ''}
                       onChange={e => setNightHaltAmountPerDay(Number(e.target.value))}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 rounded border border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-4 flex items-center bg-slate-300 rounded-full p-0.5 cursor-pointer transition-colors shadow-inner ${enableExtraHours ? 'bg-blue-600' : ''}`} onClick={() => setEnableExtraHours(!enableExtraHours)}>
+                    <div className={`bg-white w-3 h-3 rounded-full shadow transform transition-transform ${enableExtraHours ? 'translate-x-4' : ''}`}></div>
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-tight">Extra Hours</span>
+                </div>
+                {enableExtraHours && (
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="Hours"
+                      className="flex-1 sm:w-20 px-3 py-1.5 border border-slate-300 rounded text-xs font-bold shadow-sm"
+                      value={extraHours || ''}
+                      onChange={e => setExtraHours(Number(e.target.value))}
+                    />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="Rate/hr (₹)"
+                      className="flex-1 sm:w-24 px-3 py-1.5 border border-slate-300 rounded text-xs font-bold shadow-sm"
+                      value={extraHourRate || ''}
+                      onChange={e => setExtraHourRate(Number(e.target.value))}
                     />
                   </div>
                 )}

@@ -88,6 +88,7 @@ export interface InvoiceData {
   customerCompanyName: string;
   customerAddress: string;
   customerGstNo: string;
+  bookingReference?: string;
   driverName: string;
   vehicleNo: string;
   vehicleType: string;
@@ -129,6 +130,9 @@ export interface InvoiceData {
   igstAmount: number;
   advance: number;
   grandTotal: number;
+  enableExtraHours?: boolean;
+  extraHours?: number;
+  extraHourRate?: number;
 }
 
 export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blob; fileName: string }> => {
@@ -220,6 +224,14 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
   const nameLines = doc.splitTextToSize(fullCustomerName || '-', 80);
   doc.text(nameLines, valueX, currentY);
   currentY += lineHeight * nameLines.length;
+
+  if (data.bookingReference) {
+    doc.text('Booked By', labelX, currentY);
+    doc.text(':', colonX, currentY);
+    const bookedByLines = doc.splitTextToSize(data.bookingReference, 80);
+    doc.text(bookedByLines, valueX, currentY);
+    currentY += lineHeight * bookedByLines.length;
+  }
 
   if (data.customerCompanyName) {
     doc.text('Company', labelX, currentY);
@@ -432,6 +444,12 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
 
   if (rentAmount > 0) {
     tableBody.push([rentDescription, rentAmount.toFixed(2)]);
+  }
+
+  // 1.5 Extra Hours
+  if (data.enableExtraHours && (data.extraHours || 0) > 0 && (data.extraHourRate || 0) > 0) {
+    const hourCharge = data.extraHours! * data.extraHourRate!;
+    tableBody.push([`Extra Hours (${data.extraHours} hrs @ Rs${data.extraHourRate}/hr)`, hourCharge.toFixed(2)]);
   }
 
   // 2. Additional Costs (NON-TAXABLE)
