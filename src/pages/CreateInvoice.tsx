@@ -493,6 +493,7 @@ export default function CreateInvoice() {
           customerCompanyName,
           customerAddress,
           customerGstNo,
+          bookingReference,
           driverName,
           vehicleNo,
           vehicleType,

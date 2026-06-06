@@ -50,6 +50,12 @@ export default function Trips() {
     tripStartLocation: ''
   });
 
+  // Outside (unregistered) driver / vehicle toggles
+  const [useOutsideDriver, setUseOutsideDriver] = useState(false);
+  const [outsideDriverName, setOutsideDriverName] = useState('');
+  const [useOutsideVehicle, setUseOutsideVehicle] = useState(false);
+  const [outsideVehicleName, setOutsideVehicleName] = useState('');
+
   useEffect(() => {
     fetchTrips();
     fetchMasters();
@@ -89,25 +95,51 @@ export default function Trips() {
 
   const handleStartTrip = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.customerId || !formData.driverId || !formData.carId) {
-      toast.error('Please select Customer, Driver, and Car');
+
+    // Validate customer always required
+    if (!formData.customerId) {
+      toast.error('Please select a Customer');
+      return;
+    }
+    // Validate driver
+    if (!useOutsideDriver && !formData.driverId) {
+      toast.error('Please select a Driver or enable Outside Driver');
+      return;
+    }
+    if (useOutsideDriver && !outsideDriverName.trim()) {
+      toast.error('Please enter the outside driver name');
+      return;
+    }
+    // Validate vehicle
+    if (!useOutsideVehicle && !formData.carId) {
+      toast.error('Please select a Vehicle or enable Outside Vehicle');
+      return;
+    }
+    if (useOutsideVehicle && !outsideVehicleName.trim()) {
+      toast.error('Please enter the outside vehicle details');
       return;
     }
 
     try {
       const customer = customers.find(c => c.id === formData.customerId);
-      const driver = drivers.find(d => d.id === formData.driverId);
-      const car = cars.find(c => c.id === formData.carId);
+      const driver = useOutsideDriver ? null : drivers.find(d => d.id === formData.driverId);
+      const car = useOutsideVehicle ? null : cars.find(c => c.id === formData.carId);
 
       await tripService.startTrip({
         ...formData,
-        customerName: customer?.name || '',
-        driverName: driver?.name || '',
-        vehicleNo: car?.regNo || ''
+        driverId: useOutsideDriver ? '' : formData.driverId,
+        carId: useOutsideVehicle ? '' : formData.carId,
+        customerName: customer?.companyName || '',
+        driverName: useOutsideDriver ? outsideDriverName.trim() : (driver?.name || ''),
+        vehicleNo: useOutsideVehicle ? outsideVehicleName.trim() : (car?.regNo || '')
       });
 
-      toast.success('Trip started successfully');
+      toast.success('Trip dispatched successfully');
       setIsStartModalOpen(false);
+      // Reset form
+      setFormData({ customerId: '', driverId: '', carId: '', startKm: 0, startTime: new Date().toISOString().slice(0, 16), tripStartLocation: '' });
+      setUseOutsideDriver(false); setOutsideDriverName('');
+      setUseOutsideVehicle(false); setOutsideVehicleName('');
       fetchTrips();
     } catch (error) {
       console.error(error);
@@ -322,34 +354,81 @@ export default function Trips() {
                                 onChange={(e) => setFormData({...formData, customerId: e.target.value})}
                             >
                                 <option value="">Select a customer...</option>
-                                {customers.map((c: Customer) => <option key={c.id} value={c.id}>{c.companyName} ({c.name})</option>)}
+                                {customers.map((c: Customer) => <option key={c.id} value={c.id}>{c.companyName}</option>)}
                             </select>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
+                            {/* Vehicle Field */}
                             <div>
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">2. Assign Vehicle</label>
-                                <select 
-                                    required
-                                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm font-semibold text-slate-700 shadow-sm"
-                                    value={formData.carId}
-                                    onChange={(e) => setFormData({...formData, carId: e.target.value})}
-                                >
-                                    <option value="">Select vehicle...</option>
-                                    {cars.map((c: Car) => <option key={c.id} value={c.id}>{c.regNo} - {c.model}</option>)}
-                                </select>
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">2. Assign Vehicle</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setUseOutsideVehicle(v => !v); setOutsideVehicleName(''); setFormData(f => ({...f, carId: ''})); }}
+                                        className={`text-[9px] font-bold px-2 py-0.5 rounded border transition-colors ${
+                                            useOutsideVehicle
+                                            ? 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200'
+                                            : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
+                                        }`}
+                                    >
+                                        {useOutsideVehicle ? '✓ Outside' : 'Outside?'}
+                                    </button>
+                                </div>
+                                {useOutsideVehicle ? (
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. TN 01 AB 1234 - Innova"
+                                        className="w-full px-3 py-2 bg-amber-50 border border-amber-300 rounded-md focus:border-amber-500 focus:ring-1 focus:ring-amber-400 outline-none transition-all text-sm font-semibold text-slate-800 shadow-sm"
+                                        value={outsideVehicleName}
+                                        onChange={(e) => setOutsideVehicleName(e.target.value)}
+                                    />
+                                ) : (
+                                    <select 
+                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm font-semibold text-slate-700 shadow-sm"
+                                        value={formData.carId}
+                                        onChange={(e) => setFormData({...formData, carId: e.target.value})}
+                                    >
+                                        <option value="">Select vehicle...</option>
+                                        {cars.map((c: Car) => <option key={c.id} value={c.id}>{c.regNo} - {c.model}</option>)}
+                                    </select>
+                                )}
                             </div>
+
+                            {/* Driver Field */}
                             <div>
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">3. Assigned Driver</label>
-                                <select 
-                                    required
-                                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm font-semibold text-slate-700 shadow-sm"
-                                    value={formData.driverId}
-                                    onChange={(e) => setFormData({...formData, driverId: e.target.value})}
-                                >
-                                    <option value="">Select driver...</option>
-                                    {drivers.map((d: Driver) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                                </select>
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">3. Assign Driver</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setUseOutsideDriver(v => !v); setOutsideDriverName(''); setFormData(f => ({...f, driverId: ''})); }}
+                                        className={`text-[9px] font-bold px-2 py-0.5 rounded border transition-colors ${
+                                            useOutsideDriver
+                                            ? 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200'
+                                            : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
+                                        }`}
+                                    >
+                                        {useOutsideDriver ? '✓ Outside' : 'Outside?'}
+                                    </button>
+                                </div>
+                                {useOutsideDriver ? (
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. Rajan Kumar"
+                                        className="w-full px-3 py-2 bg-amber-50 border border-amber-300 rounded-md focus:border-amber-500 focus:ring-1 focus:ring-amber-400 outline-none transition-all text-sm font-semibold text-slate-800 shadow-sm"
+                                        value={outsideDriverName}
+                                        onChange={(e) => setOutsideDriverName(e.target.value)}
+                                    />
+                                ) : (
+                                    <select 
+                                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm font-semibold text-slate-700 shadow-sm"
+                                        value={formData.driverId}
+                                        onChange={(e) => setFormData({...formData, driverId: e.target.value})}
+                                    >
+                                        <option value="">Select driver...</option>
+                                        {drivers.map((d: Driver) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                    </select>
+                                )}
                             </div>
                         </div>
 
