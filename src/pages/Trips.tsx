@@ -171,8 +171,8 @@ export default function Trips() {
     setActiveTrip(trip);
     setCompleteData({
       endTime: new Date().toISOString().slice(0, 16),
-      endKm: trip.startKm || 0,
-      tripEndLocation: trip.tripStartLocation || '',
+      endKm: 0,
+      tripEndLocation: '',
       additionalCosts: []
     });
     setNewCostLabel('');
