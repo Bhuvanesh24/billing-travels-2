@@ -26,6 +26,7 @@ export interface Trip {
   endKm?: number;
   endTime?: string;
   tripEndLocation?: string;
+  additionalCosts?: { id: string; label: string; amount: number }[];
   invoiceId?: string;
   totalBill?: number;
   
@@ -79,6 +80,11 @@ export const tripService = {
       status: 'completed',
       completedAt: new Date().toISOString()
     });
+  },
+
+  async updateTrip(id: string, updateData: Partial<Trip>) {
+    const ref = doc(db, COLLECTION_NAME, id);
+    return await updateDoc(ref, updateData);
   },
 
   async deleteTrip(id: string) {

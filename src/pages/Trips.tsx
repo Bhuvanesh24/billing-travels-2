@@ -12,8 +12,12 @@ import {
   X,
   History,
   FileText,
-  CheckCircle2
+  CheckCircle2,
+  Edit,
+  Trash2,
+  IndianRupee
 } from 'lucide-react';
+import { type AdditionalCost } from '../lib/calculator';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { tripService, type Trip } from '../services/tripService';
@@ -55,6 +59,22 @@ export default function Trips() {
   const [outsideDriverName, setOutsideDriverName] = useState('');
   const [useOutsideVehicle, setUseOutsideVehicle] = useState(false);
   const [outsideVehicleName, setOutsideVehicleName] = useState('');
+
+  // Complete & Edit Modal State
+  const [activeTrip, setActiveTrip] = useState<Trip | null>(null);
+  
+  const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
+  const [completeData, setCompleteData] = useState({
+    endTime: new Date().toISOString().slice(0, 16),
+    endKm: 0,
+    tripEndLocation: '',
+    additionalCosts: [] as AdditionalCost[]
+  });
+  const [newCostLabel, setNewCostLabel] = useState('');
+  const [newCostAmount, setNewCostAmount] = useState('');
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editData, setEditData] = useState<Partial<Trip>>({});
 
   useEffect(() => {
     fetchTrips();
@@ -147,8 +167,67 @@ export default function Trips() {
     }
   };
 
-  const handleEndTrip = (trip: Trip) => {
-    // Navigate to Create Invoice page with trip details pre-filled
+  const openCompleteModal = (trip: Trip) => {
+    setActiveTrip(trip);
+    setCompleteData({
+      endTime: new Date().toISOString().slice(0, 16),
+      endKm: trip.startKm || 0,
+      tripEndLocation: trip.tripStartLocation || '',
+      additionalCosts: []
+    });
+    setNewCostLabel('');
+    setNewCostAmount('');
+    setIsCompleteModalOpen(true);
+  };
+
+  const handleCompleteTripSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeTrip?.id) return;
+    try {
+      await tripService.endTrip(activeTrip.id, { ...completeData });
+      toast.success('Trip completed successfully');
+      setIsCompleteModalOpen(false);
+      fetchTrips();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to complete trip');
+    }
+  };
+
+  const openEditModal = (trip: Trip) => {
+    setActiveTrip(trip);
+    setEditData({
+      startKm: trip.startKm || 0,
+      startTime: trip.startTime || '',
+      tripStartLocation: trip.tripStartLocation || '',
+      endKm: trip.endKm || 0,
+      endTime: trip.endTime || '',
+      tripEndLocation: trip.tripEndLocation || '',
+      additionalCosts: trip.additionalCosts || [],
+      customerName: trip.customerName || '',
+      driverName: trip.driverName || '',
+      vehicleNo: trip.vehicleNo || ''
+    });
+    setNewCostLabel('');
+    setNewCostAmount('');
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditTripSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeTrip?.id) return;
+    try {
+      await tripService.updateTrip(activeTrip.id, editData);
+      toast.success('Trip updated successfully');
+      setIsEditModalOpen(false);
+      fetchTrips();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to update trip');
+    }
+  };
+
+  const handleGenerateBill = (trip: Trip) => {
     navigate(`/create?tripId=${trip.id}`);
   };
 
@@ -245,10 +324,10 @@ export default function Trips() {
                   </div>
 
                   <button 
-                    onClick={() => handleEndTrip(trip)}
-                    className="w-full py-2.5 bg-slate-900 text-white rounded font-bold text-xs hover:bg-black transition-all flex items-center justify-center gap-2"
+                    onClick={() => openCompleteModal(trip)}
+                    className="w-full py-2.5 bg-red-600 text-white rounded font-bold text-xs hover:bg-red-700 transition-all flex items-center justify-center gap-2"
                   >
-                    Finish Journey & Bill
+                    Complete Trip
                   </button>
                 </div>
               ))}
@@ -301,12 +380,20 @@ export default function Trips() {
                   </div>
 
                   {!trip.invoiceId && (
-                    <button 
-                      onClick={() => handleEndTrip(trip)}
-                      className="w-full py-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <FileText size={12} /> Generate Invoice
-                    </button>
+                    <div className="flex gap-2 mt-3">
+                      <button 
+                        onClick={() => openEditModal(trip)}
+                        className="flex-1 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5"
+                      >
+                         <Edit size={12} /> Edit
+                      </button>
+                      <button 
+                        onClick={() => handleGenerateBill(trip)}
+                        className="flex-1 py-2 bg-slate-900 text-white hover:bg-black rounded font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <FileText size={12} /> Generate Bill
+                      </button>
+                    </div>
                   )}
                 </div>
               )) : (
@@ -474,6 +561,304 @@ export default function Trips() {
                         >
                             <Activity size={18} />
                             Deploy Journey
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+      )}
+
+      {/* Complete Trip Modal */}
+      {isCompleteModalOpen && activeTrip && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-md">
+            <div className="bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl border border-slate-200 animate-in fade-in zoom-in duration-300">
+                <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50 sticky top-0 z-10">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-red-600 rounded flex items-center justify-center text-white">
+                            <CheckCircle2 size={18} />
+                        </div>
+                        <div>
+                            <h2 className="text-sm font-bold text-slate-800 leading-tight">Complete Trip</h2>
+                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{activeTrip.customerName}</p>
+                        </div>
+                    </div>
+                    <button onClick={() => setIsCompleteModalOpen(false)} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 transition-colors border border-transparent hover:border-slate-200">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleCompleteTripSubmit} className="p-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">ODOMETER End</label>
+                            <div className="relative">
+                                <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                <input 
+                                    type="number" required placeholder="0"
+                                    className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm font-bold text-slate-900 shadow-sm"
+                                    value={completeData.endKm || ''}
+                                    onChange={(e) => setCompleteData({...completeData, endKm: Number(e.target.value)})}
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Arrival Time</label>
+                            <input 
+                                type="datetime-local" required
+                                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm font-semibold text-slate-700 shadow-sm"
+                                value={completeData.endTime}
+                                onChange={(e) => setCompleteData({...completeData, endTime: e.target.value})}
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Arrival Point</label>
+                        <input 
+                            type="text" required placeholder="e.g. Office, Airport, Guest House..."
+                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm font-semibold text-slate-700 shadow-sm"
+                            value={completeData.tripEndLocation}
+                            onChange={(e) => setCompleteData({...completeData, tripEndLocation: e.target.value})}
+                        />
+                    </div>
+
+                    {/* Sundry Expenses */}
+                    <div className="pt-4 border-t border-slate-100">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <IndianRupee size={12} /> Sundry Expenses
+                      </label>
+                      
+                      <div className="space-y-2 mb-3">
+                        {completeData.additionalCosts.map((cost, index) => (
+                          <div key={index} className="flex gap-2 items-center bg-slate-50 p-2 rounded-md border border-slate-200">
+                            <span className="flex-1 text-xs font-bold text-slate-700">{cost.label}</span>
+                            <span className="text-xs font-black text-slate-900">₹{cost.amount}</span>
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                const newCosts = [...completeData.additionalCosts];
+                                newCosts.splice(index, 1);
+                                setCompleteData({...completeData, additionalCosts: newCosts});
+                              }}
+                              className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <input 
+                          type="text"
+                          placeholder="Expense Name (e.g. Toll)"
+                          className="flex-[2] px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-xs font-semibold"
+                          value={newCostLabel}
+                          onChange={e => setNewCostLabel(e.target.value)}
+                        />
+                        <input 
+                          type="number"
+                          placeholder="Amount"
+                          className="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-xs font-bold"
+                          value={newCostAmount}
+                          onChange={e => setNewCostAmount(e.target.value)}
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            if (newCostLabel && newCostAmount) {
+                              setCompleteData({
+                                ...completeData, 
+                                additionalCosts: [...completeData.additionalCosts, { id: crypto.randomUUID(), label: newCostLabel, amount: Number(newCostAmount) }]
+                              });
+                              setNewCostLabel('');
+                              setNewCostAmount('');
+                            }
+                          }}
+                          className="bg-slate-900 text-white px-3 py-2 rounded-md hover:bg-black transition-colors"
+                        >
+                          <Plus size={16} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="pt-4">
+                        <button 
+                            type="submit"
+                            className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded font-bold transition-all shadow-sm flex items-center justify-center gap-2"
+                        >
+                            <CheckCircle2 size={18} />
+                            Confirm Completion
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+      )}
+
+      {/* Edit Trip Modal */}
+      {isEditModalOpen && activeTrip && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-md">
+            <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl border border-slate-200 animate-in fade-in zoom-in duration-300">
+                <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50 sticky top-0 z-10">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-slate-900 rounded flex items-center justify-center text-white">
+                            <Edit size={18} />
+                        </div>
+                        <div>
+                            <h2 className="text-sm font-bold text-slate-800 leading-tight">Edit Trip Log</h2>
+                            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{activeTrip.customerName}</p>
+                        </div>
+                    </div>
+                    <button onClick={() => setIsEditModalOpen(false)} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 transition-colors border border-transparent hover:border-slate-200">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleEditTripSubmit} className="p-6 space-y-6">
+                    {/* Start Details */}
+                    <div className="space-y-4">
+                      <h3 className="text-xs font-black text-slate-800 border-b border-slate-100 pb-2">DISPATCH DETAILS</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">ODOMETER Start</label>
+                              <div className="relative">
+                                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                  <input 
+                                      type="number" required
+                                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm font-bold text-slate-900 shadow-sm"
+                                      value={editData.startKm || ''}
+                                      onChange={(e) => setEditData({...editData, startKm: Number(e.target.value)})}
+                                  />
+                              </div>
+                          </div>
+                          <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Departure Time</label>
+                              <input 
+                                  type="datetime-local" required
+                                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm font-semibold text-slate-700 shadow-sm"
+                                  value={editData.startTime || ''}
+                                  onChange={(e) => setEditData({...editData, startTime: e.target.value})}
+                              />
+                          </div>
+                      </div>
+                      <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Departure Point</label>
+                          <input 
+                              type="text" required
+                              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm font-semibold text-slate-700 shadow-sm"
+                              value={editData.tripStartLocation || ''}
+                              onChange={(e) => setEditData({...editData, tripStartLocation: e.target.value})}
+                          />
+                      </div>
+                    </div>
+
+                    {/* End Details */}
+                    <div className="space-y-4">
+                      <h3 className="text-xs font-black text-slate-800 border-b border-slate-100 pb-2">COMPLETION DETAILS</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">ODOMETER End</label>
+                              <div className="relative">
+                                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                  <input 
+                                      type="number" required
+                                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm font-bold text-slate-900 shadow-sm"
+                                      value={editData.endKm || ''}
+                                      onChange={(e) => setEditData({...editData, endKm: Number(e.target.value)})}
+                                  />
+                              </div>
+                          </div>
+                          <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Arrival Time</label>
+                              <input 
+                                  type="datetime-local" required
+                                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm font-semibold text-slate-700 shadow-sm"
+                                  value={editData.endTime || ''}
+                                  onChange={(e) => setEditData({...editData, endTime: e.target.value})}
+                              />
+                          </div>
+                      </div>
+                      <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Arrival Point</label>
+                          <input 
+                              type="text" required
+                              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm font-semibold text-slate-700 shadow-sm"
+                              value={editData.tripEndLocation || ''}
+                              onChange={(e) => setEditData({...editData, tripEndLocation: e.target.value})}
+                          />
+                      </div>
+                    </div>
+
+                    {/* Sundry Expenses */}
+                    <div className="space-y-4">
+                      <h3 className="text-xs font-black text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-2">
+                        <IndianRupee size={14} /> SUNDRY EXPENSES
+                      </h3>
+                      
+                      <div className="space-y-2 mb-3">
+                        {editData.additionalCosts?.map((cost, index) => (
+                          <div key={index} className="flex gap-2 items-center bg-slate-50 p-2 rounded-md border border-slate-200">
+                            <span className="flex-1 text-xs font-bold text-slate-700">{cost.label}</span>
+                            <span className="text-xs font-black text-slate-900">₹{cost.amount}</span>
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                const newCosts = [...(editData.additionalCosts || [])];
+                                newCosts.splice(index, 1);
+                                setEditData({...editData, additionalCosts: newCosts});
+                              }}
+                              className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ))}
+                        {(!editData.additionalCosts || editData.additionalCosts.length === 0) && (
+                          <p className="text-xs text-slate-400 font-medium italic">No sundry expenses logged.</p>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <input 
+                          type="text"
+                          placeholder="Expense Name"
+                          className="flex-[2] px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-xs font-semibold"
+                          value={newCostLabel}
+                          onChange={e => setNewCostLabel(e.target.value)}
+                        />
+                        <input 
+                          type="number"
+                          placeholder="Amount"
+                          className="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-xs font-bold"
+                          value={newCostAmount}
+                          onChange={e => setNewCostAmount(e.target.value)}
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            if (newCostLabel && newCostAmount) {
+                              setEditData({
+                                ...editData, 
+                                additionalCosts: [...(editData.additionalCosts || []), { id: crypto.randomUUID(), label: newCostLabel, amount: Number(newCostAmount) }]
+                              });
+                              setNewCostLabel('');
+                              setNewCostAmount('');
+                            }
+                          }}
+                          className="bg-slate-900 text-white px-3 py-2 rounded-md hover:bg-black transition-colors"
+                        >
+                          <Plus size={16} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-100">
+                        <button 
+                            type="submit"
+                            className="w-full py-2.5 bg-slate-900 hover:bg-black text-white rounded font-bold transition-all shadow-sm flex items-center justify-center gap-2"
+                        >
+                            Save Changes
                         </button>
                     </div>
                 </form>

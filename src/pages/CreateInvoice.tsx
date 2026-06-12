@@ -237,13 +237,23 @@ export default function CreateInvoice() {
           setLoadingMetadata(true);
           const trip = await tripService.getTripById(tripId);
           if (trip) {
-            // Pre-fill from trip
+            // Pre-fill from trip (Start Details)
             setCustomerName(trip.customerName || '');
             setDriverName(trip.driverName || '');
             setVehicleNo(trip.vehicleNo || '');
             setTripStartLocation(trip.tripStartLocation || '');
             setStartKm(trip.startKm || 0);
             setStartTime(trip.startTime || '');
+            
+            // Pre-fill from trip (End Details)
+            setEndKm(trip.endKm || 0);
+            setEndTime(trip.endTime || new Date().toISOString().slice(0, 16));
+            setTripEndLocation(trip.tripEndLocation || '');
+            
+            // Pre-fill Sundry Expenses
+            if (trip.additionalCosts && trip.additionalCosts.length > 0) {
+              setAdditionalCosts(trip.additionalCosts);
+            }
             
             // Try to fetch detailed customer/car info from masters
             if (trip.customerId) {
@@ -263,9 +273,6 @@ export default function CreateInvoice() {
                     setVehicleType(carSnap.data().type || '');
                 }
             }
-            
-            // Set end time to now
-            setEndTime(new Date().toISOString().slice(0, 16));
             
             toast.success('Trip data loaded');
           }
