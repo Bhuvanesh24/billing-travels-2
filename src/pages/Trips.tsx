@@ -16,7 +16,8 @@ import {
   Edit,
   Trash2,
   IndianRupee,
-  Filter
+  Filter,
+  Search
 } from 'lucide-react';
 import { type AdditionalCost } from '../lib/calculator';
 import { useNavigate } from 'react-router-dom';
@@ -34,41 +35,58 @@ export default function Trips() {
   const pageSize = 10;
 
   // Filter State
-  const [dateFilterType, setDateFilterType] = useState<'all' | 'this_month' | 'month' | 'custom'>('this_month');
-  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [filterCompany, setFilterCompany] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'ongoing' | 'completed_unbilled' | 'billed'>('all');
+  const defaultFilters = {
+    dateFilterType: 'this_month' as 'all' | 'this_month' | 'month' | 'custom',
+    filterMonth: new Date().toISOString().slice(0, 7),
+    startDate: '',
+    endDate: '',
+    filterCompany: '',
+    filterStatus: 'all' as 'all' | 'ongoing' | 'completed_unbilled' | 'billed'
+  };
+  const [draftFilters, setDraftFilters] = useState(defaultFilters);
+  const [appliedFilters, setAppliedFilters] = useState(defaultFilters);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Filtering Logic
   const filteredTrips = allTrips.filter(trip => {
     // 1. Status Filter
-    if (filterStatus === 'ongoing' && trip.status !== 'ongoing') return false;
-    if (filterStatus === 'completed_unbilled' && (trip.status !== 'completed' || trip.invoiceId)) return false;
-    if (filterStatus === 'billed' && !trip.invoiceId) return false;
+    if (appliedFilters.filterStatus === 'ongoing' && trip.status !== 'ongoing') return false;
+    if (appliedFilters.filterStatus === 'completed_unbilled' && (trip.status !== 'completed' || trip.invoiceId)) return false;
+    if (appliedFilters.filterStatus === 'billed' && !trip.invoiceId) return false;
 
     // 2. Company Filter
-    if (filterCompany && trip.customerId !== filterCompany) return false;
+    if (appliedFilters.filterCompany && trip.customerId !== appliedFilters.filterCompany) return false;
 
     // 3. Date Filter (using startTime)
     const tripDateStr = trip.startTime || trip.createdAt || '';
-    if (!tripDateStr) return true;
-    
-    if (dateFilterType === 'this_month') {
-      const now = new Date();
-      const tripDate = new Date(tripDateStr);
-      if (tripDate.getMonth() !== now.getMonth() || tripDate.getFullYear() !== now.getFullYear()) return false;
-    } else if (dateFilterType === 'month') {
-      if (!tripDateStr.startsWith(filterMonth)) return false;
-    } else if (dateFilterType === 'custom') {
-      const tTime = new Date(tripDateStr).getTime();
-      if (startDate && tTime < new Date(startDate).getTime()) return false;
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        if (tTime > end.getTime()) return false;
+    let matchesDate = true;
+    if (tripDateStr) {
+      if (appliedFilters.dateFilterType === 'this_month') {
+        const now = new Date();
+        const tripDate = new Date(tripDateStr);
+        if (tripDate.getMonth() !== now.getMonth() || tripDate.getFullYear() !== now.getFullYear()) matchesDate = false;
+      } else if (appliedFilters.dateFilterType === 'month') {
+        if (!tripDateStr.startsWith(appliedFilters.filterMonth)) matchesDate = false;
+      } else if (appliedFilters.dateFilterType === 'custom') {
+        const tTime = new Date(tripDateStr).getTime();
+        if (appliedFilters.startDate && tTime < new Date(appliedFilters.startDate).getTime()) matchesDate = false;
+        if (appliedFilters.endDate) {
+          const end = new Date(appliedFilters.endDate);
+          end.setHours(23, 59, 59, 999);
+          if (tTime > end.getTime()) matchesDate = false;
+        }
       }
+    }
+    if (!matchesDate) return false;
+
+    // 4. Search Filter
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = 
+        (trip.customerName || '').toLowerCase().includes(searchLower) ||
+        (trip.driverName || '').toLowerCase().includes(searchLower) ||
+        (trip.vehicleNo || '').toLowerCase().includes(searchLower);
+      if (!matchesSearch) return false;
     }
 
     return true;
@@ -319,14 +337,26 @@ export default function Trips() {
         </div>
       </div>
 
+      {/* Search Bar */}
+      <div className="relative w-full">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+        <input
+          type="text"
+          placeholder="Search trips by customer, driver, or vehicle..."
+          className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-4 focus:ring-blue-50 focus:bg-white transition-all font-medium text-slate-700"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
       {/* Filters */}
       <div className="bg-slate-50 border border-slate-200 p-4 rounded-lg flex flex-col md:flex-row gap-4 items-end">
-        <div className="w-full md:w-auto flex-1">
+        <div className="w-full md:w-auto flex-[1.5]">
           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1"><Filter size={12}/> Date Filter</label>
           <select 
             className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
-            value={dateFilterType}
-            onChange={(e) => setDateFilterType(e.target.value as any)}
+            value={draftFilters.dateFilterType}
+            onChange={(e) => setDraftFilters({...draftFilters, dateFilterType: e.target.value as any})}
           >
             <option value="all">All Time</option>
             <option value="this_month">This Month</option>
@@ -335,27 +365,27 @@ export default function Trips() {
           </select>
         </div>
 
-        {dateFilterType === 'month' && (
+        {draftFilters.dateFilterType === 'month' && (
           <div className="w-full md:w-auto flex-1">
             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Select Month</label>
             <input 
               type="month"
               className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
-              value={filterMonth}
-              onChange={(e) => setFilterMonth(e.target.value)}
+              value={draftFilters.filterMonth}
+              onChange={(e) => setDraftFilters({...draftFilters, filterMonth: e.target.value})}
             />
           </div>
         )}
 
-        {dateFilterType === 'custom' && (
+        {draftFilters.dateFilterType === 'custom' && (
           <>
             <div className="w-full md:w-auto flex-1">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">From Date</label>
               <input 
                 type="date"
                 className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                value={draftFilters.startDate}
+                onChange={(e) => setDraftFilters({...draftFilters, startDate: e.target.value})}
               />
             </div>
             <div className="w-full md:w-auto flex-1">
@@ -363,8 +393,8 @@ export default function Trips() {
               <input 
                 type="date"
                 className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                value={draftFilters.endDate}
+                onChange={(e) => setDraftFilters({...draftFilters, endDate: e.target.value})}
               />
             </div>
           </>
@@ -374,8 +404,8 @@ export default function Trips() {
           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Company</label>
           <select 
             className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
-            value={filterCompany}
-            onChange={(e) => setFilterCompany(e.target.value)}
+            value={draftFilters.filterCompany}
+            onChange={(e) => setDraftFilters({...draftFilters, filterCompany: e.target.value})}
           >
             <option value="">All Companies</option>
             {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
@@ -386,8 +416,8 @@ export default function Trips() {
           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Status</label>
           <select 
             className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as any)}
+            value={draftFilters.filterStatus}
+            onChange={(e) => setDraftFilters({...draftFilters, filterStatus: e.target.value as any})}
           >
             <option value="all">All Status</option>
             <option value="ongoing">Trip Not Completed</option>
@@ -396,14 +426,20 @@ export default function Trips() {
           </select>
         </div>
 
-        <div className="w-full md:w-auto">
+        <div className="w-full md:w-auto flex items-center gap-2">
+          <button 
+            onClick={() => setAppliedFilters(draftFilters)}
+            className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-bold transition-colors h-[38px] flex justify-center items-center gap-1.5"
+          >
+            Apply
+          </button>
           <button 
             onClick={() => {
-              setDateFilterType('all');
-              setFilterCompany('');
-              setFilterStatus('all');
+              setDraftFilters(defaultFilters);
+              setAppliedFilters(defaultFilters);
+              setSearchTerm('');
             }}
-            className="w-full px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-md text-xs font-bold transition-colors h-[38px] flex justify-center items-center gap-1.5"
+            className="flex-1 px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-md text-xs font-bold transition-colors h-[38px] flex justify-center items-center gap-1.5"
           >
             <X size={14} /> Clear
           </button>

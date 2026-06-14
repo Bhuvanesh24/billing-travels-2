@@ -14,16 +14,13 @@ import {
   Banknote,
   Smartphone,
   Building2,
-  Edit2,
-  MapPin,
-  ArrowRight
+  Edit2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useDrive } from '../services/useDrive';
 import { db, deleteInvoiceMetadata } from '../services/firestore';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { Pagination } from '../components/Pagination';
-import { tripService, type Trip } from '../services/tripService';
 import { masterService, type Customer } from '../services/masterService';
 
 interface InvoiceMetadata {
@@ -62,12 +59,16 @@ export default function InvoiceList() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // New Filters
+  const defaultFilters = {
+    dateFilterType: 'this_month' as 'all' | 'this_month' | 'month' | 'custom',
+    filterMonth: new Date().toISOString().slice(0, 7),
+    startDate: '',
+    endDate: '',
+    filterCompany: ''
+  };
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [dateFilterType, setDateFilterType] = useState<'all' | 'this_month' | 'month' | 'custom'>('this_month');
-  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [filterCompany, setFilterCompany] = useState('');
+  const [draftFilters, setDraftFilters] = useState(defaultFilters);
+  const [appliedFilters, setAppliedFilters] = useState(defaultFilters);
 
   // Payment modal state
   const [payingInvoice, setPayingInvoice] = useState<InvoiceMetadata | null>(null);
@@ -75,8 +76,6 @@ export default function InvoiceList() {
   const [amountReceived, setAmountReceived] = useState('');
   const [savingPayment, setSavingPayment] = useState(false);
 
-  // Ready for Invoicing trips
-  const [pendingTrips, setPendingTrips] = useState<Trip[]>([]);
   const [showLegacy, setShowLegacy] = useState(false);
 
   // Helper: check all possible field names
@@ -90,9 +89,8 @@ export default function InvoiceList() {
   async function fetchInvoices() {
     try {
       setLoading(true);
-      const [invoiceSnap, trips, cust] = await Promise.all([
+      const [invoiceSnap, cust] = await Promise.all([
         getDocs(collection(db, 'invoices')),
-        tripService.getCompletedTripsWithoutInvoice(),
         masterService.getCustomers()
       ]);
 
@@ -101,7 +99,6 @@ export default function InvoiceList() {
         .sort((a, b) => new Date((a as any).createdAt).getTime() - new Date((b as any).createdAt).getTime());
       
       setInvoices(data);
-      setPendingTrips(trips);
       setCustomers(cust);
     } catch (error) {
       console.error(error);
@@ -180,24 +177,24 @@ export default function InvoiceList() {
     const matchesFilter = filterStatus === 'all' || inv.paymentStatus === filterStatus;
     const matchesSource = showLegacy || (inv.tripId !== undefined && inv.tripId !== null);
     
-    // Company Filter (we try to match either by customerId if available, or by customerName)
-    const matchesCompany = filterCompany ? (inv.customerId === filterCompany || inv.customerName === customers.find(c => c.id === filterCompany)?.companyName) : true;
+    // Company Filter
+    const matchesCompany = appliedFilters.filterCompany ? (inv.customerId === appliedFilters.filterCompany || inv.customerName === customers.find(c => c.id === appliedFilters.filterCompany)?.companyName) : true;
 
     // Date Filter (using createdAt)
     let matchesDate = true;
     const invDateStr = inv.createdAt;
     if (invDateStr) {
-      if (dateFilterType === 'this_month') {
+      if (appliedFilters.dateFilterType === 'this_month') {
         const now = new Date();
         const invDate = new Date(invDateStr);
         if (invDate.getMonth() !== now.getMonth() || invDate.getFullYear() !== now.getFullYear()) matchesDate = false;
-      } else if (dateFilterType === 'month') {
-        if (!invDateStr.startsWith(filterMonth)) matchesDate = false;
-      } else if (dateFilterType === 'custom') {
+      } else if (appliedFilters.dateFilterType === 'month') {
+        if (!invDateStr.startsWith(appliedFilters.filterMonth)) matchesDate = false;
+      } else if (appliedFilters.dateFilterType === 'custom') {
         const iTime = new Date(invDateStr).getTime();
-        if (startDate && iTime < new Date(startDate).getTime()) matchesDate = false;
-        if (endDate) {
-          const end = new Date(endDate);
+        if (appliedFilters.startDate && iTime < new Date(appliedFilters.startDate).getTime()) matchesDate = false;
+        if (appliedFilters.endDate) {
+          const end = new Date(appliedFilters.endDate);
           end.setHours(23, 59, 59, 999);
           if (iTime > end.getTime()) matchesDate = false;
         }
@@ -216,7 +213,7 @@ export default function InvoiceList() {
   // Reset to first page when searching or filtering
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterStatus]);
+  }, [searchTerm, filterStatus, appliedFilters]);
 
   const totalPending = invoices
     .filter(i => i.paymentStatus === 'pending')
@@ -295,8 +292,8 @@ export default function InvoiceList() {
           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1"><Filter size={12}/> Date Filter</label>
           <select 
             className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
-            value={dateFilterType}
-            onChange={(e) => setDateFilterType(e.target.value as any)}
+            value={draftFilters.dateFilterType}
+            onChange={(e) => setDraftFilters({...draftFilters, dateFilterType: e.target.value as any})}
           >
             <option value="all">All Time</option>
             <option value="this_month">This Month</option>
@@ -305,27 +302,27 @@ export default function InvoiceList() {
           </select>
         </div>
 
-        {dateFilterType === 'month' && (
+        {draftFilters.dateFilterType === 'month' && (
           <div className="w-full md:w-auto flex-1">
             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Select Month</label>
             <input 
               type="month"
               className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
-              value={filterMonth}
-              onChange={(e) => setFilterMonth(e.target.value)}
+              value={draftFilters.filterMonth}
+              onChange={(e) => setDraftFilters({...draftFilters, filterMonth: e.target.value})}
             />
           </div>
         )}
 
-        {dateFilterType === 'custom' && (
+        {draftFilters.dateFilterType === 'custom' && (
           <>
             <div className="w-full md:w-auto flex-1">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">From Date</label>
               <input 
                 type="date"
                 className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                value={draftFilters.startDate}
+                onChange={(e) => setDraftFilters({...draftFilters, startDate: e.target.value})}
               />
             </div>
             <div className="w-full md:w-auto flex-1">
@@ -333,8 +330,8 @@ export default function InvoiceList() {
               <input 
                 type="date"
                 className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                value={draftFilters.endDate}
+                onChange={(e) => setDraftFilters({...draftFilters, endDate: e.target.value})}
               />
             </div>
           </>
@@ -344,71 +341,36 @@ export default function InvoiceList() {
           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Company</label>
           <select 
             className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
-            value={filterCompany}
-            onChange={(e) => setFilterCompany(e.target.value)}
+            value={draftFilters.filterCompany}
+            onChange={(e) => setDraftFilters({...draftFilters, filterCompany: e.target.value})}
           >
             <option value="">All Companies</option>
             {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
           </select>
         </div>
 
-        <div className="w-full md:w-auto">
+        <div className="w-full md:w-auto flex items-center gap-2">
+          <button 
+            onClick={() => setAppliedFilters(draftFilters)}
+            className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-bold transition-colors h-[38px] flex justify-center items-center gap-1.5"
+          >
+            Apply
+          </button>
           <button 
             onClick={() => {
-              setDateFilterType('all');
-              setFilterCompany('');
+              setDraftFilters(defaultFilters);
+              setAppliedFilters(defaultFilters);
               setSearchTerm('');
               setFilterStatus('all');
             }}
-            className="w-full px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-md text-xs font-bold transition-colors h-[38px] flex justify-center items-center gap-1.5"
+            className="flex-1 px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-md text-xs font-bold transition-colors h-[38px] flex justify-center items-center gap-1.5"
           >
             <X size={14} /> Clear
           </button>
         </div>
       </div>
 
-      {/* Ready for Invoicing Section */}
-      {!loading && pendingTrips.length > 0 && (
-        <div className="bg-blue-50/50 rounded-[2rem] border border-blue-100 p-8 space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
-                <Clock size={20} />
-              </div>
-              <div>
-                <h2 className="text-xl font-black text-slate-900 leading-tight">Ready for Invoicing</h2>
-                <p className="text-xs text-blue-600 font-bold uppercase tracking-wider">Completed journeys pending settlement</p>
-              </div>
-            </div>
-            <span className="bg-blue-600 text-white text-[10px] font-black px-3 py-1 rounded-full">{pendingTrips.length} Trips</span>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {pendingTrips.map((trip) => (
-              <div key={trip.id} className="bg-white p-5 rounded-2xl border border-blue-100 shadow-sm hover:shadow-md transition-all group">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-sm leading-tight">{trip.customerName}</h3>
-                    <p className="text-[10px] text-slate-500 font-medium">{trip.vehicleNo} • {trip.driverName}</p>
-                  </div>
-                  <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-                    <MapPin size={16} />
-                  </div>
-                </div>
-                <div className="flex items-center justify-between pt-3 border-t border-slate-50">
-                   <p className="text-[10px] text-slate-400 font-bold">{new Date(trip.completedAt || trip.startTime).toLocaleDateString()}</p>
-                   <Link 
-                    to={`/create?tripId=${trip.id}`}
-                    className="flex items-center gap-1.5 text-blue-600 font-black text-[10px] uppercase tracking-widest hover:gap-2 transition-all"
-                   >
-                     Bill Now <ArrowRight size={12} />
-                   </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Invoice Grid */}
       {loading ? (
