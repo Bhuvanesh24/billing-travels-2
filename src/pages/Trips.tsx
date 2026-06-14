@@ -15,7 +15,8 @@ import {
   CheckCircle2,
   Edit,
   Trash2,
-  IndianRupee
+  IndianRupee,
+  Filter
 } from 'lucide-react';
 import { type AdditionalCost } from '../lib/calculator';
 import { useNavigate } from 'react-router-dom';
@@ -26,12 +27,55 @@ import { Pagination } from '../components/Pagination';
 
 export default function Trips() {
   const navigate = useNavigate();
-  const [ongoingTrips, setOngoingTrips] = useState<Trip[]>([]);
-  const [completedTrips, setCompletedTrips] = useState<Trip[]>([]);
+  const [allTrips, setAllTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [isStartModalOpen, setIsStartModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
+
+  // Filter State
+  const [dateFilterType, setDateFilterType] = useState<'all' | 'this_month' | 'month' | 'custom'>('this_month');
+  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [filterCompany, setFilterCompany] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'ongoing' | 'completed_unbilled' | 'billed'>('all');
+
+  // Filtering Logic
+  const filteredTrips = allTrips.filter(trip => {
+    // 1. Status Filter
+    if (filterStatus === 'ongoing' && trip.status !== 'ongoing') return false;
+    if (filterStatus === 'completed_unbilled' && (trip.status !== 'completed' || trip.invoiceId)) return false;
+    if (filterStatus === 'billed' && !trip.invoiceId) return false;
+
+    // 2. Company Filter
+    if (filterCompany && trip.customerId !== filterCompany) return false;
+
+    // 3. Date Filter (using startTime)
+    const tripDateStr = trip.startTime || trip.createdAt || '';
+    if (!tripDateStr) return true;
+    
+    if (dateFilterType === 'this_month') {
+      const now = new Date();
+      const tripDate = new Date(tripDateStr);
+      if (tripDate.getMonth() !== now.getMonth() || tripDate.getFullYear() !== now.getFullYear()) return false;
+    } else if (dateFilterType === 'month') {
+      if (!tripDateStr.startsWith(filterMonth)) return false;
+    } else if (dateFilterType === 'custom') {
+      const tTime = new Date(tripDateStr).getTime();
+      if (startDate && tTime < new Date(startDate).getTime()) return false;
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        if (tTime > end.getTime()) return false;
+      }
+    }
+
+    return true;
+  });
+
+  const ongoingTrips = filteredTrips.filter(t => t.status === 'ongoing' || (t.status === 'completed' && !t.invoiceId));
+  const completedTrips = filteredTrips.filter(t => t.status === 'completed' && !!t.invoiceId);
 
   const totalPages = Math.ceil(ongoingTrips.length / pageSize);
   const paginatedTrips = ongoingTrips.slice(
@@ -84,12 +128,8 @@ export default function Trips() {
   async function fetchTrips() {
     try {
       setLoading(true);
-      const [ongoing, history] = await Promise.all([
-        tripService.getOngoingTrips(),
-        tripService.getTripHistory(10)
-      ]);
-      setOngoingTrips(ongoing);
-      setCompletedTrips(history.filter(t => t.status === 'completed'));
+      const trips = await tripService.getAllTrips();
+      setAllTrips(trips);
     } catch (error) {
       console.error(error);
       toast.error('Failed to load trips');
@@ -279,6 +319,97 @@ export default function Trips() {
         </div>
       </div>
 
+      {/* Filters */}
+      <div className="bg-slate-50 border border-slate-200 p-4 rounded-lg flex flex-col md:flex-row gap-4 items-end">
+        <div className="w-full md:w-auto flex-1">
+          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1"><Filter size={12}/> Date Filter</label>
+          <select 
+            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
+            value={dateFilterType}
+            onChange={(e) => setDateFilterType(e.target.value as any)}
+          >
+            <option value="all">All Time</option>
+            <option value="this_month">This Month</option>
+            <option value="month">Specific Month</option>
+            <option value="custom">Custom Range</option>
+          </select>
+        </div>
+
+        {dateFilterType === 'month' && (
+          <div className="w-full md:w-auto flex-1">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Select Month</label>
+            <input 
+              type="month"
+              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+            />
+          </div>
+        )}
+
+        {dateFilterType === 'custom' && (
+          <>
+            <div className="w-full md:w-auto flex-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">From Date</label>
+              <input 
+                type="date"
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+            <div className="w-full md:w-auto flex-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">To Date</label>
+              <input 
+                type="date"
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+          </>
+        )}
+
+        <div className="w-full md:w-auto flex-[1.5]">
+          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Company</label>
+          <select 
+            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
+            value={filterCompany}
+            onChange={(e) => setFilterCompany(e.target.value)}
+          >
+            <option value="">All Companies</option>
+            {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
+          </select>
+        </div>
+
+        <div className="w-full md:w-auto flex-[1.2]">
+          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Status</label>
+          <select 
+            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as any)}
+          >
+            <option value="all">All Status</option>
+            <option value="ongoing">Trip Not Completed</option>
+            <option value="completed_unbilled">Bill Not Generated</option>
+            <option value="billed">Billed</option>
+          </select>
+        </div>
+
+        <div className="w-full md:w-auto">
+          <button 
+            onClick={() => {
+              setDateFilterType('all');
+              setFilterCompany('');
+              setFilterStatus('all');
+            }}
+            className="w-full px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-md text-xs font-bold transition-colors h-[38px] flex justify-center items-center gap-1.5"
+          >
+            <X size={14} /> Clear
+          </button>
+        </div>
+      </div>
+
       {/* Main Content Layout */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Active Trips Column */}
@@ -323,12 +454,29 @@ export default function Trips() {
                     </div>
                   </div>
 
-                  <button 
-                    onClick={() => openCompleteModal(trip)}
-                    className="w-full py-2.5 bg-red-600 text-white rounded font-bold text-xs hover:bg-red-700 transition-all flex items-center justify-center gap-2"
-                  >
-                    Complete Trip
-                  </button>
+                  {trip.status === 'ongoing' ? (
+                    <button 
+                      onClick={() => openCompleteModal(trip)}
+                      className="w-full py-2.5 bg-red-600 text-white rounded font-bold text-xs hover:bg-red-700 transition-all flex items-center justify-center gap-2"
+                    >
+                      Complete Trip
+                    </button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => openEditModal(trip)}
+                        className="flex-1 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5"
+                      >
+                         <Edit size={12} /> Edit
+                      </button>
+                      <button 
+                        onClick={() => handleGenerateBill(trip)}
+                        className="flex-1 py-2 bg-slate-900 text-white hover:bg-black rounded font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <FileText size={12} /> Generate Bill
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -379,22 +527,6 @@ export default function Trips() {
                     <span className="flex items-center gap-1"><Hash size={10} /> {trip.endKm ? `${trip.endKm - (trip.startKm || 0)} KM` : ''}</span>
                   </div>
 
-                  {!trip.invoiceId && (
-                    <div className="flex gap-2 mt-3">
-                      <button 
-                        onClick={() => openEditModal(trip)}
-                        className="flex-1 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5"
-                      >
-                         <Edit size={12} /> Edit
-                      </button>
-                      <button 
-                        onClick={() => handleGenerateBill(trip)}
-                        className="flex-1 py-2 bg-slate-900 text-white hover:bg-black rounded font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5"
-                      >
-                        <FileText size={12} /> Generate Bill
-                      </button>
-                    </div>
-                  )}
                 </div>
               )) : (
                 <div className="p-10 text-center">

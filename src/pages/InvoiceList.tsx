@@ -24,6 +24,7 @@ import { db, deleteInvoiceMetadata } from '../services/firestore';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { Pagination } from '../components/Pagination';
 import { tripService, type Trip } from '../services/tripService';
+import { masterService, type Customer } from '../services/masterService';
 
 interface InvoiceMetadata {
   id: string;
@@ -42,6 +43,7 @@ interface InvoiceMetadata {
   paymentDate?: string;
   amountReceived?: number;
   tripId?: string | null;
+  customerId?: string;
 }
 
 const PAYMENT_MODES = [
@@ -58,6 +60,14 @@ export default function InvoiceList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'paid'>('all');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // New Filters
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [dateFilterType, setDateFilterType] = useState<'all' | 'this_month' | 'month' | 'custom'>('this_month');
+  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [filterCompany, setFilterCompany] = useState('');
 
   // Payment modal state
   const [payingInvoice, setPayingInvoice] = useState<InvoiceMetadata | null>(null);
@@ -80,17 +90,19 @@ export default function InvoiceList() {
   async function fetchInvoices() {
     try {
       setLoading(true);
-      const [invoiceSnap, trips] = await Promise.all([
+      const [invoiceSnap, trips, cust] = await Promise.all([
         getDocs(collection(db, 'invoices')),
-        tripService.getCompletedTripsWithoutInvoice()
+        tripService.getCompletedTripsWithoutInvoice(),
+        masterService.getCustomers()
       ]);
 
       const data = invoiceSnap.docs
         .map(d => ({ id: d.id, ...d.data() } as InvoiceMetadata))
-        .sort((a, b) => new Date((b as any).createdAt).getTime() - new Date((a as any).createdAt).getTime());
+        .sort((a, b) => new Date((a as any).createdAt).getTime() - new Date((b as any).createdAt).getTime());
       
       setInvoices(data);
       setPendingTrips(trips);
+      setCustomers(cust);
     } catch (error) {
       console.error(error);
       toast.error('Failed to load invoices');
@@ -167,7 +179,32 @@ export default function InvoiceList() {
       inv.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterStatus === 'all' || inv.paymentStatus === filterStatus;
     const matchesSource = showLegacy || (inv.tripId !== undefined && inv.tripId !== null);
-    return matchesSearch && matchesFilter && matchesSource;
+    
+    // Company Filter (we try to match either by customerId if available, or by customerName)
+    const matchesCompany = filterCompany ? (inv.customerId === filterCompany || inv.customerName === customers.find(c => c.id === filterCompany)?.companyName) : true;
+
+    // Date Filter (using createdAt)
+    let matchesDate = true;
+    const invDateStr = inv.createdAt;
+    if (invDateStr) {
+      if (dateFilterType === 'this_month') {
+        const now = new Date();
+        const invDate = new Date(invDateStr);
+        if (invDate.getMonth() !== now.getMonth() || invDate.getFullYear() !== now.getFullYear()) matchesDate = false;
+      } else if (dateFilterType === 'month') {
+        if (!invDateStr.startsWith(filterMonth)) matchesDate = false;
+      } else if (dateFilterType === 'custom') {
+        const iTime = new Date(invDateStr).getTime();
+        if (startDate && iTime < new Date(startDate).getTime()) matchesDate = false;
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          if (iTime > end.getTime()) matchesDate = false;
+        }
+      }
+    }
+
+    return matchesSearch && matchesFilter && matchesSource && matchesCompany && matchesDate;
   });
 
   const totalPages = Math.ceil(filteredInvoices.length / pageSize);
@@ -250,6 +287,84 @@ export default function InvoiceList() {
         >
           {showLegacy ? 'Trip-Only Mode' : 'Show All History'}
         </button>
+      </div>
+
+      {/* Advanced Filters */}
+      <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4 items-end">
+        <div className="w-full md:w-auto flex-[1.5]">
+          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1"><Filter size={12}/> Date Filter</label>
+          <select 
+            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
+            value={dateFilterType}
+            onChange={(e) => setDateFilterType(e.target.value as any)}
+          >
+            <option value="all">All Time</option>
+            <option value="this_month">This Month</option>
+            <option value="month">Specific Month</option>
+            <option value="custom">Custom Range</option>
+          </select>
+        </div>
+
+        {dateFilterType === 'month' && (
+          <div className="w-full md:w-auto flex-1">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Select Month</label>
+            <input 
+              type="month"
+              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+            />
+          </div>
+        )}
+
+        {dateFilterType === 'custom' && (
+          <>
+            <div className="w-full md:w-auto flex-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">From Date</label>
+              <input 
+                type="date"
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+            <div className="w-full md:w-auto flex-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">To Date</label>
+              <input 
+                type="date"
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+          </>
+        )}
+
+        <div className="w-full md:w-auto flex-[2]">
+          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Company</label>
+          <select 
+            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 outline-none text-sm font-semibold text-slate-700 shadow-sm"
+            value={filterCompany}
+            onChange={(e) => setFilterCompany(e.target.value)}
+          >
+            <option value="">All Companies</option>
+            {customers.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
+          </select>
+        </div>
+
+        <div className="w-full md:w-auto">
+          <button 
+            onClick={() => {
+              setDateFilterType('all');
+              setFilterCompany('');
+              setSearchTerm('');
+              setFilterStatus('all');
+            }}
+            className="w-full px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-md text-xs font-bold transition-colors h-[38px] flex justify-center items-center gap-1.5"
+          >
+            <X size={14} /> Clear
+          </button>
+        </div>
       </div>
 
       {/* Ready for Invoicing Section */}

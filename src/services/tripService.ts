@@ -50,7 +50,15 @@ export const tripService = {
     const snap = await getDocs(q);
     return snap.docs
       .map(d => ({ id: d.id, ...d.data() } as Trip))
-      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+  },
+
+  async getAllTrips() {
+    const q = query(collection(db, COLLECTION_NAME));
+    const snap = await getDocs(q);
+    return snap.docs
+      .map(d => ({ id: d.id, ...d.data() } as Trip))
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
   },
 
   async getTripHistory(limitCount: number = 20) {
@@ -61,7 +69,7 @@ export const tripService = {
     const snap = await getDocs(q);
     return snap.docs
       .map(d => ({ id: d.id, ...d.data() } as Trip))
-      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
       .slice(0, limitCount);
   },
 
@@ -107,6 +115,6 @@ export const tripService = {
     return snap.docs
       .map(d => ({ id: d.id, ...d.data() } as Trip))
       .filter(t => !t.invoiceId)
-      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
   }
 };

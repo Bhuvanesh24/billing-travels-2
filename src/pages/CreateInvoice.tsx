@@ -168,6 +168,9 @@ export default function CreateInvoice() {
   // Upload State
   const [uploading, setUploading] = useState(false);
 
+  // Preserve Creation Date
+  const [createdAt, setCreatedAt] = useState('');
+
   // Load existing metadata if editing OR if ending a trip
   useEffect(() => {
     async function load() {
@@ -222,6 +225,7 @@ export default function CreateInvoice() {
             setIgstPercentage(data.igstPercentage || 5);
             setAdvance(data.advance || 0);
             setNextPlannedNumber(data.invoiceNumber);
+            setCreatedAt(data.createdAt || '');
           } else {
             toast.error('Invoice data not found.');
             setNextPlannedNumber(decodeURIComponent(id));
@@ -545,6 +549,7 @@ export default function CreateInvoice() {
           extraHours,
           extraHourRate,
           totalBill,
+          ...(createdAt ? { createdAt } : {})
         };
 
         // 3. Generate PDF Blob
