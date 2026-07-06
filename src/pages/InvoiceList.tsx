@@ -17,7 +17,6 @@ import {
   Edit2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useDrive } from '../services/useDrive';
 import { db, deleteInvoiceMetadata } from '../services/firestore';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { Pagination } from '../components/Pagination';
@@ -51,7 +50,6 @@ const PAYMENT_MODES = [
 ];
 
 export default function InvoiceList() {
-  const { isSignedIn } = useDrive();
   const [invoices, setInvoices] = useState<InvoiceMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -390,7 +388,7 @@ export default function InvoiceList() {
                   </div>
                   <div className="flex gap-1">
                     {/* View Invoice PDF in Drive */}
-                    {isSignedIn && inv.driveFileId && (
+                    {inv.driveFileId && (
                       <a
                         href={`https://drive.google.com/file/d/${inv.driveFileId}/view`}
                         target="_blank"

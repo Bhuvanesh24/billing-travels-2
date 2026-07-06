@@ -168,8 +168,9 @@ export default function CreateInvoice() {
   // Upload State
   const [uploading, setUploading] = useState(false);
 
-  // Preserve Creation Date
+  // Preserve Metadata
   const [createdAt, setCreatedAt] = useState('');
+  const [savedDriveFileId, setSavedDriveFileId] = useState<string | null>(null);
 
   // Load existing metadata if editing OR if ending a trip
   useEffect(() => {
@@ -226,6 +227,7 @@ export default function CreateInvoice() {
             setAdvance(data.advance || 0);
             setNextPlannedNumber(data.invoiceNumber);
             setCreatedAt(data.createdAt || '');
+            setSavedDriveFileId(data.driveFileId || null);
           } else {
             toast.error('Invoice data not found.');
             setNextPlannedNumber(decodeURIComponent(id));
@@ -568,7 +570,7 @@ export default function CreateInvoice() {
           ...invoiceData,
           ...(isEditing ? {} : { paymentStatus: 'pending' }),
           tripId: tripId || null,
-          driveFileId: null,  // updated after Drive upload succeeds
+          driveFileId: isEditing ? (savedDriveFileId || driveFileId) : null,
         });
 
         // 5. Attempt Drive upload (optional — won't block if it fails)

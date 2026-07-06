@@ -286,6 +286,19 @@ export default function Trips() {
     navigate(`/create?tripId=${trip.id}`);
   };
 
+  const handleDeleteTrip = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this trip? This action cannot be undone.")) {
+      try {
+        await tripService.deleteTrip(id);
+        setAllTrips(prev => prev.filter(t => t.id !== id));
+        toast.success("Trip deleted successfully");
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to delete trip");
+      }
+    }
+  };
+
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-6 space-y-6">
       {/* Header Row */}
@@ -471,8 +484,11 @@ export default function Trips() {
                         <p className="text-xs text-slate-500 font-medium">{trip.vehicleNo}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 text-blue-600 rounded text-[10px] font-bold uppercase tracking-wider">
-                      <Clock size={10} /> {trip.startTime ? new Date(trip.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 text-blue-600 rounded text-[10px] font-bold uppercase tracking-wider">
+                        <CalendarDays size={10} /> {trip.startTime ? new Date(trip.startTime).toLocaleDateString([], { day: 'numeric', month: 'short' }) : ''}
+                        <Clock size={10} className="ml-1" /> {trip.startTime ? new Date(trip.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </div>
                     </div>
                   </div>
 
@@ -488,25 +504,41 @@ export default function Trips() {
                   </div>
 
                   {trip.status === 'ongoing' ? (
-                    <button
-                      onClick={() => openCompleteModal(trip)}
-                      className="w-full py-2.5 bg-red-600 text-white rounded font-bold text-xs hover:bg-red-700 transition-all flex items-center justify-center gap-2"
-                    >
-                      Complete Trip
-                    </button>
-                  ) : (
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => openEditModal(trip)}
-                        className="flex-1 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5"
+                      <button 
+                        onClick={() => openCompleteModal(trip)}
+                        className="flex-1 py-2.5 bg-red-600 text-white rounded font-bold text-xs hover:bg-red-700 transition-all flex items-center justify-center gap-2"
                       >
-                        <Edit size={12} /> Edit
+                        Complete Trip
                       </button>
                       <button
+                        onClick={() => handleDeleteTrip(trip.id!)}
+                        className="px-3 py-2 bg-slate-100 text-slate-500 rounded hover:bg-red-50 hover:text-red-600 transition-all"
+                        title="Delete Trip"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => openEditModal(trip)}
+                        className="flex-[0.8] py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5"
+                      >
+                         <Edit size={12} /> Edit
+                      </button>
+                      <button 
                         onClick={() => handleGenerateBill(trip)}
                         className="flex-1 py-2 bg-slate-900 text-white hover:bg-black rounded font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5"
                       >
                         <FileText size={12} /> Generate Bill
+                      </button>
+                      <button
+                        onClick={() => handleDeleteTrip(trip.id!)}
+                        className="px-2.5 py-2 bg-slate-100 text-slate-500 rounded hover:bg-red-50 hover:text-red-600 transition-all flex items-center justify-center"
+                        title="Delete Trip"
+                      >
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   )}
@@ -751,6 +783,26 @@ export default function Trips() {
             </div>
 
             <form onSubmit={handleCompleteTripSubmit} className="p-6 space-y-4">
+              {/* Trip Dispatch Summary */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4 space-y-2">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Driver & Vehicle</p>
+                    <p className="text-xs font-semibold text-slate-800">{activeTrip.driverName}</p>
+                    <p className="text-xs font-semibold text-slate-800">{activeTrip.vehicleNo}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Departure</p>
+                    <p className="text-xs font-semibold text-slate-800">{activeTrip.tripStartLocation}</p>
+                    <p className="text-xs font-semibold text-slate-800">{activeTrip.startTime ? new Date(activeTrip.startTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short'}) : ''}</p>
+                  </div>
+                </div>
+                <div className="pt-2 border-t border-slate-200">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Start Odometer</p>
+                  <p className="text-sm font-black text-blue-600">{activeTrip.startKm} KM</p>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">ODOMETER End</label>
