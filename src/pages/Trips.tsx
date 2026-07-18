@@ -17,7 +17,8 @@ import {
   Trash2,
   IndianRupee,
   Filter,
-  Search
+  Search,
+  Eye
 } from 'lucide-react';
 import { type AdditionalCost } from '../lib/calculator';
 import { useNavigate } from 'react-router-dom';
@@ -134,6 +135,8 @@ export default function Trips() {
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editData, setEditData] = useState<Partial<Trip>>({});
+
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
   useEffect(() => {
     fetchTrips();
@@ -512,6 +515,13 @@ export default function Trips() {
                         Complete Trip
                       </button>
                       <button
+                        onClick={() => { setActiveTrip(trip); setIsViewModalOpen(true); }}
+                        className="px-3 py-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-all"
+                        title="View Details"
+                      >
+                        <Eye size={16} />
+                      </button>
+                      <button
                         onClick={() => handleDeleteTrip(trip.id!)}
                         className="px-3 py-2 bg-slate-100 text-slate-500 rounded hover:bg-red-50 hover:text-red-600 transition-all"
                         title="Delete Trip"
@@ -521,6 +531,13 @@ export default function Trips() {
                     </div>
                   ) : (
                     <div className="flex gap-2">
+                      <button
+                        onClick={() => { setActiveTrip(trip); setIsViewModalOpen(true); }}
+                        className="px-2.5 py-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-all flex items-center justify-center"
+                        title="View Details"
+                      >
+                        <Eye size={14} />
+                      </button>
                       <button 
                         onClick={() => openEditModal(trip)}
                         className="flex-[0.8] py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5"
@@ -1080,6 +1097,129 @@ export default function Trips() {
           </div>
         </div>
       )}
+
+      {/* View Trip Details Modal */}
+      {isViewModalOpen && activeTrip && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-md">
+          <div className="bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl border border-slate-200 animate-in fade-in zoom-in duration-300">
+            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50 sticky top-0 z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center text-blue-600">
+                  <Eye size={18} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-800 leading-tight">Trip Details</h2>
+                  <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{activeTrip.status}</p>
+                </div>
+              </div>
+              <button onClick={() => setIsViewModalOpen(false)} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 transition-colors border border-transparent hover:border-slate-200">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Customer Info */}
+              <div>
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <User size={14} className="text-blue-600" /> Customer & Driver
+                </h3>
+                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Customer</p>
+                    <p className="text-sm font-bold text-slate-800">{activeTrip.customerName}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Driver</p>
+                    <p className="text-sm font-bold text-slate-800">{activeTrip.driverName}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Vehicle</p>
+                    <p className="text-sm font-bold text-slate-800">{activeTrip.vehicleNo}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Journey Info */}
+              <div>
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <MapPin size={14} className="text-blue-600" /> Journey
+                </h3>
+                <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Start Location</p>
+                      <p className="text-sm font-bold text-slate-800">{activeTrip.tripStartLocation}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Start Time</p>
+                      <p className="text-sm font-bold text-slate-800">{activeTrip.startTime ? new Date(activeTrip.startTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '-'}</p>
+                    </div>
+                  </div>
+                  
+                  {activeTrip.status === 'completed' && (
+                    <div className="flex justify-between items-start pt-4 border-t border-slate-200">
+                      <div>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">End Location</p>
+                        <p className="text-sm font-bold text-slate-800">{activeTrip.tripEndLocation || '-'}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">End Time</p>
+                        <p className="text-sm font-bold text-slate-800">{activeTrip.endTime ? new Date(activeTrip.endTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '-'}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Odometer Info */}
+              <div>
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <Activity size={14} className="text-blue-600" /> Odometer
+                </h3>
+                <div className="flex items-center justify-between bg-blue-50 p-4 rounded-xl border border-blue-100">
+                  <div className="text-center flex-1">
+                    <p className="text-[10px] font-bold text-blue-600/70 uppercase tracking-wider mb-1">Start</p>
+                    <p className="text-lg font-black text-blue-700">{activeTrip.startKm} <span className="text-xs font-bold">KM</span></p>
+                  </div>
+                  
+                  {activeTrip.status === 'completed' && activeTrip.endKm ? (
+                    <>
+                      <div className="w-8 border-t-2 border-dashed border-blue-300"></div>
+                      <div className="text-center flex-1">
+                        <p className="text-[10px] font-bold text-blue-600/70 uppercase tracking-wider mb-1">Total</p>
+                        <p className="text-lg font-black text-blue-900">{activeTrip.endKm - activeTrip.startKm} <span className="text-xs font-bold">KM</span></p>
+                      </div>
+                      <div className="w-8 border-t-2 border-dashed border-blue-300"></div>
+                      <div className="text-center flex-1">
+                        <p className="text-[10px] font-bold text-blue-600/70 uppercase tracking-wider mb-1">End</p>
+                        <p className="text-lg font-black text-blue-700">{activeTrip.endKm} <span className="text-xs font-bold">KM</span></p>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* Expenses Info */}
+              {activeTrip.additionalCosts && activeTrip.additionalCosts.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <IndianRupee size={14} className="text-blue-600" /> Sundry Expenses
+                  </h3>
+                  <div className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">
+                    {activeTrip.additionalCosts.map((cost, idx) => (
+                      <div key={cost.id} className={`flex justify-between items-center p-3 px-4 ${idx !== 0 ? 'border-t border-slate-200' : ''}`}>
+                        <p className="text-xs font-bold text-slate-700">{cost.label}</p>
+                        <p className="text-xs font-black text-slate-900">₹{cost.amount}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

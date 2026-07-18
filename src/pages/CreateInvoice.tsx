@@ -570,7 +570,7 @@ export default function CreateInvoice() {
           ...invoiceData,
           ...(isEditing ? {} : { paymentStatus: 'pending' }),
           tripId: tripId || null,
-          driveFileId: isEditing ? (savedDriveFileId || driveFileId) : null,
+          driveFileId: isEditing ? (savedDriveFileId || driveFileId || null) : null,
         });
 
         // 5. Attempt Drive upload (optional — won't block if it fails)
