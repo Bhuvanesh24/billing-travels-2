@@ -7,7 +7,12 @@ import {
   User,
   History,
   IndianRupee,
-  Download
+  Download,
+  Filter,
+  CalendarDays,
+  X,
+  Activity,
+  ArrowRight
 } from 'lucide-react';
 import { db } from '../services/firestore';
 import { collection, getDocs } from 'firebase/firestore';
@@ -41,6 +46,26 @@ export default function Accounts() {
   const [carMetrics, setCarMetrics] = useState<BusinessMetric[]>([]);
   const [driverMetrics, setDriverMetrics] = useState<BusinessMetric[]>([]);
 
+  // Raw Data State
+  const [rawInvoices, setRawInvoices] = useState<any[]>([]);
+  const [rawExpenses, setRawExpenses] = useState<any[]>([]);
+  const [rawCars, setRawCars] = useState<any[]>([]);
+  const [rawDrivers, setRawDrivers] = useState<any[]>([]);
+
+  // Filter State
+  const defaultFilters = {
+    dateFilterType: 'this_month' as 'all' | 'this_month' | 'month' | 'custom',
+    filterMonth: new Date().toISOString().slice(0, 7),
+    startDate: '',
+    endDate: ''
+  };
+  const [draftFilters, setDraftFilters] = useState(defaultFilters);
+  const [appliedFilters, setAppliedFilters] = useState(defaultFilters);
+
+  // Modal State
+  const [selectedCarMetrics, setSelectedCarMetrics] = useState<BusinessMetric | null>(null);
+  const [isCarModalOpen, setIsCarModalOpen] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -55,54 +80,10 @@ export default function Accounts() {
         getDocs(collection(db, 'drivers')),
       ]);
 
-      const invoices = invSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
-      const expenses = expSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
-      const cars = carSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
-      const drivers = driSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
-
-      const getAmt = (inv: any) => inv.totalAmount || inv.grandTotal || 0;
-
-      const revenue = invoices.reduce((s: number, i: any) => s + getAmt(i), 0);
-      const pendingRevenue = invoices.filter((i: any) => i.paymentStatus === 'pending').reduce((s: number, i: any) => s + getAmt(i), 0);
-      const totalExpenses = expenses.reduce((s: number, e: any) => s + (e.amount || 0), 0);
-      setTotals({ revenue, expenses: totalExpenses, netProfit: revenue - totalExpenses, pendingRevenue });
-
-      // Ledger
-      const incomeEntries: LedgerEntry[] = invoices.map((inv: any) => ({
-        type: 'income',
-        name: inv.customerName || 'Customer',
-        date: inv.createdAt,
-        amount: getAmt(inv),
-        category: inv.paymentStatus === 'paid' ? 'Collected' : 'Pending',
-      }));
-      const expenseEntries: LedgerEntry[] = expenses.map((exp: any) => ({
-        type: 'expense',
-        name: exp.description || exp.label || 'Expense',
-        date: exp.createdAt || exp.date,
-        amount: exp.amount || 0,
-        category: exp.category || 'General',
-      }));
-      const allEntries = [...incomeEntries, ...expenseEntries]
-        .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
-      setLedger(allEntries);
-
-      // Car Metrics
-      const cm = cars.map((car: any) => {
-        const rev = invoices.filter((i: any) => i.vehicleNo === car.regNo).reduce((s: number, i: any) => s + getAmt(i), 0);
-        const ex = expenses.filter((e: any) => e.carId === car.id).reduce((s: number, e: any) => s + (e.amount || 0), 0);
-        const trips = invoices.filter((i: any) => i.vehicleNo === car.regNo).length;
-        return { id: car.id, name: `${car.regNo} (${car.model})`, revenue: rev, expense: ex, profit: rev - ex, trips };
-      }).sort((a: BusinessMetric, b: BusinessMetric) => b.profit - a.profit);
-      setCarMetrics(cm);
-
-      // Driver Metrics
-      const dm = drivers.map((dri: any) => {
-        const rev = invoices.filter((i: any) => i.driverName === dri.name).reduce((s: number, i: any) => s + getAmt(i), 0);
-        const trips = invoices.filter((i: any) => i.driverName === dri.name).length;
-        return { id: dri.id, name: dri.name, revenue: rev, expense: 0, profit: rev, trips };
-      }).sort((a: BusinessMetric, b: BusinessMetric) => b.revenue - a.revenue);
-      setDriverMetrics(dm);
-
+      setRawInvoices(invSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setRawExpenses(expSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setRawCars(carSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setRawDrivers(driSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (error) {
       console.error(error);
       toast.error('Failed to load accounting data');
@@ -110,6 +91,98 @@ export default function Accounts() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (!rawInvoices.length && !rawExpenses.length && !rawCars.length && !rawDrivers.length) return;
+
+    const filteredInvoices = rawInvoices.filter(inv => {
+      const dStr = inv.createdAt || inv.date || '';
+      if (!dStr) return false;
+      const d = new Date(dStr);
+      
+      if (appliedFilters.dateFilterType === 'this_month') {
+        const now = new Date();
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      }
+      if (appliedFilters.dateFilterType === 'month' && appliedFilters.filterMonth) {
+        const [yyyy, mm] = appliedFilters.filterMonth.split('-');
+        return d.getFullYear() === parseInt(yyyy) && d.getMonth() === parseInt(mm) - 1;
+      }
+      if (appliedFilters.dateFilterType === 'custom' && appliedFilters.startDate && appliedFilters.endDate) {
+        const start = new Date(appliedFilters.startDate);
+        const end = new Date(appliedFilters.endDate);
+        end.setHours(23, 59, 59, 999);
+        return d >= start && d <= end;
+      }
+      return true;
+    });
+
+    const filteredExpenses = rawExpenses.filter(exp => {
+      const dStr = exp.createdAt || exp.date || '';
+      if (!dStr) return false;
+      const d = new Date(dStr);
+      
+      if (appliedFilters.dateFilterType === 'this_month') {
+        const now = new Date();
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      }
+      if (appliedFilters.dateFilterType === 'month' && appliedFilters.filterMonth) {
+        const [yyyy, mm] = appliedFilters.filterMonth.split('-');
+        return d.getFullYear() === parseInt(yyyy) && d.getMonth() === parseInt(mm) - 1;
+      }
+      if (appliedFilters.dateFilterType === 'custom' && appliedFilters.startDate && appliedFilters.endDate) {
+        const start = new Date(appliedFilters.startDate);
+        const end = new Date(appliedFilters.endDate);
+        end.setHours(23, 59, 59, 999);
+        return d >= start && d <= end;
+      }
+      return true;
+    });
+
+    const getAmt = (inv: any) => inv.totalAmount || inv.grandTotal || 0;
+
+    const revenue = filteredInvoices.reduce((s: number, i: any) => s + getAmt(i), 0);
+    const pendingRevenue = filteredInvoices.filter((i: any) => i.paymentStatus === 'pending').reduce((s: number, i: any) => s + getAmt(i), 0);
+    const totalExpenses = filteredExpenses.reduce((s: number, e: any) => s + (e.amount || 0), 0);
+    setTotals({ revenue, expenses: totalExpenses, netProfit: revenue - totalExpenses, pendingRevenue });
+
+    // Ledger
+    const incomeEntries: LedgerEntry[] = filteredInvoices.map((inv: any) => ({
+      type: 'income',
+      name: inv.customerName || 'Customer',
+      date: inv.createdAt || inv.date,
+      amount: getAmt(inv),
+      category: inv.paymentStatus === 'paid' ? 'Collected' : 'Pending',
+    }));
+    const expenseEntries: LedgerEntry[] = filteredExpenses.map((exp: any) => ({
+      type: 'expense',
+      name: exp.description || exp.label || 'Expense',
+      date: exp.createdAt || exp.date,
+      amount: exp.amount || 0,
+      category: exp.category || 'General',
+    }));
+    const allEntries = [...incomeEntries, ...expenseEntries]
+      .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+    setLedger(allEntries);
+
+    // Car Metrics
+    const cm = rawCars.map((car: any) => {
+      const rev = filteredInvoices.filter((i: any) => i.vehicleNo === car.regNo).reduce((s: number, i: any) => s + getAmt(i), 0);
+      const ex = filteredExpenses.filter((e: any) => e.carId === car.id).reduce((s: number, e: any) => s + (e.amount || 0), 0);
+      const trips = filteredInvoices.filter((i: any) => i.vehicleNo === car.regNo).length;
+      return { id: car.id, name: `${car.regNo} (${car.model})`, revenue: rev, expense: ex, profit: rev - ex, trips };
+    }).sort((a: BusinessMetric, b: BusinessMetric) => b.profit - a.profit);
+    setCarMetrics(cm);
+
+    // Driver Metrics
+    const dm = rawDrivers.map((dri: any) => {
+      const rev = filteredInvoices.filter((i: any) => i.driverName === dri.name).reduce((s: number, i: any) => s + getAmt(i), 0);
+      const trips = filteredInvoices.filter((i: any) => i.driverName === dri.name).length;
+      return { id: dri.id, name: dri.name, revenue: rev, expense: 0, profit: rev, trips };
+    }).sort((a: BusinessMetric, b: BusinessMetric) => b.revenue - a.revenue);
+    setDriverMetrics(dm);
+
+  }, [rawInvoices, rawExpenses, rawCars, rawDrivers, appliedFilters]);
 
   const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
     { id: 'overview', label: 'Overview', icon: <TrendingUp size={16} /> },
@@ -148,6 +221,69 @@ export default function Accounts() {
         >
           <Download size={16} />
           Refresh
+        </button>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl flex flex-col sm:flex-row gap-4 items-end">
+        <div className="flex-1 min-w-[200px]">
+          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Time Period</label>
+          <div className="relative">
+            <CalendarDays size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <select
+              className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 outline-none focus:border-blue-500 transition-colors"
+              value={draftFilters.dateFilterType}
+              onChange={(e) => setDraftFilters({ ...draftFilters, dateFilterType: e.target.value as any })}
+            >
+              <option value="all">All Time</option>
+              <option value="this_month">This Month</option>
+              <option value="month">Select Month</option>
+              <option value="custom">Custom Range</option>
+            </select>
+          </div>
+        </div>
+
+        {draftFilters.dateFilterType === 'month' && (
+          <div className="flex-1 min-w-[200px]">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Month</label>
+            <input
+              type="month"
+              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 outline-none focus:border-blue-500 transition-colors"
+              value={draftFilters.filterMonth}
+              onChange={(e) => setDraftFilters({ ...draftFilters, filterMonth: e.target.value })}
+            />
+          </div>
+        )}
+
+        {draftFilters.dateFilterType === 'custom' && (
+          <>
+            <div className="flex-1 min-w-[150px]">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Start Date</label>
+              <input
+                type="date"
+                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 outline-none focus:border-blue-500 transition-colors"
+                value={draftFilters.startDate}
+                onChange={(e) => setDraftFilters({ ...draftFilters, startDate: e.target.value })}
+              />
+            </div>
+            <div className="flex-1 min-w-[150px]">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">End Date</label>
+              <input
+                type="date"
+                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 outline-none focus:border-blue-500 transition-colors"
+                value={draftFilters.endDate}
+                onChange={(e) => setDraftFilters({ ...draftFilters, endDate: e.target.value })}
+              />
+            </div>
+          </>
+        )}
+
+        <button
+          onClick={() => setAppliedFilters(draftFilters)}
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+        >
+          <Filter size={16} />
+          Apply
         </button>
       </div>
 
@@ -271,10 +407,17 @@ export default function Accounts() {
             </div>
           ) : (
             carMetrics.map((car, idx) => (
-              <div key={car.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 hover:shadow-md transition-all">
+              <div 
+                key={car.id} 
+                className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 hover:shadow-md hover:border-blue-200 cursor-pointer transition-all group"
+                onClick={() => {
+                  setSelectedCarMetrics(car);
+                  setIsCarModalOpen(true);
+                }}
+              >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black text-sm">
+                    <div className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black text-sm group-hover:bg-blue-600 transition-colors">
                       #{idx + 1}
                     </div>
                     <div>
@@ -366,6 +509,157 @@ export default function Accounts() {
               </div>
             ))
           )}
+        </div>
+      )}
+      {/* Car Details Modal */}
+      {isCarModalOpen && selectedCarMetrics && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-md">
+          <div className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl border border-slate-200 animate-in fade-in zoom-in duration-300">
+            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50 sticky top-0 z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center text-blue-600">
+                  <CarIcon size={18} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-800 leading-tight">Detailed Stats: {selectedCarMetrics.name}</h2>
+                  <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Filtered View</p>
+                </div>
+              </div>
+              <button onClick={() => setIsCarModalOpen(false)} className="p-1.5 hover:bg-slate-100 rounded text-slate-400 transition-colors border border-transparent hover:border-slate-200">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                  <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Trips</p>
+                  <p className="font-black text-xl text-blue-700">{selectedCarMetrics.trips}</p>
+                </div>
+                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
+                  <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Revenue</p>
+                  <p className="font-black text-xl text-emerald-700">₹ {selectedCarMetrics.revenue.toLocaleString()}</p>
+                </div>
+                <div className="bg-red-50 border border-red-100 rounded-xl p-4">
+                  <p className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-1">Expenses</p>
+                  <p className="font-black text-xl text-red-700">₹ {selectedCarMetrics.expense.toLocaleString()}</p>
+                </div>
+                <div className={`border rounded-xl p-4 ${selectedCarMetrics.profit >= 0 ? 'bg-indigo-50 border-indigo-100' : 'bg-orange-50 border-orange-100'}`}>
+                  <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${selectedCarMetrics.profit >= 0 ? 'text-indigo-500' : 'text-orange-500'}`}>Net Profit</p>
+                  <p className={`font-black text-xl ${selectedCarMetrics.profit >= 0 ? 'text-indigo-700' : 'text-orange-700'}`}>₹ {selectedCarMetrics.profit.toLocaleString()}</p>
+                </div>
+              </div>
+
+              {/* Transactions Split */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Trips List */}
+                <div className="bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden flex flex-col h-[400px]">
+                  <div className="px-4 py-3 border-b border-slate-50 bg-slate-50/50 flex items-center gap-2">
+                    <Activity size={14} className="text-emerald-500" />
+                    <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest">Trips Completed</h3>
+                  </div>
+                  <div className="overflow-y-auto flex-1 p-2 space-y-2">
+                    {(() => {
+                      const carRegNo = rawCars.find(c => c.id === selectedCarMetrics.id)?.regNo;
+                      const trips = rawInvoices.filter(i => {
+                        if (i.vehicleNo !== carRegNo) return false;
+                        const dStr = i.createdAt || i.date || '';
+                        if (!dStr) return false;
+                        const d = new Date(dStr);
+                        if (appliedFilters.dateFilterType === 'this_month') {
+                          const now = new Date();
+                          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                        }
+                        if (appliedFilters.dateFilterType === 'month' && appliedFilters.filterMonth) {
+                          const [yyyy, mm] = appliedFilters.filterMonth.split('-');
+                          return d.getFullYear() === parseInt(yyyy) && d.getMonth() === parseInt(mm) - 1;
+                        }
+                        if (appliedFilters.dateFilterType === 'custom' && appliedFilters.startDate && appliedFilters.endDate) {
+                          const start = new Date(appliedFilters.startDate);
+                          const end = new Date(appliedFilters.endDate);
+                          end.setHours(23, 59, 59, 999);
+                          return d >= start && d <= end;
+                        }
+                        return true;
+                      });
+
+                      if (trips.length === 0) return <p className="text-xs text-slate-400 text-center py-8 font-semibold">No trips found in this period.</p>;
+                      
+                      return trips.map((trip, idx) => (
+                        <div key={idx} className="p-3 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <p className="text-xs font-bold text-slate-800">{trip.customerName || 'Customer'}</p>
+                              {trip.tripStartLocation && (
+                                <p className="text-[10px] text-slate-500 font-semibold flex items-center gap-1 mt-0.5">
+                                  {trip.tripStartLocation} <ArrowRight size={10} /> {trip.tripEndLocation}
+                                </p>
+                              )}
+                            </div>
+                            <p className="text-xs font-black text-emerald-600">₹ {(trip.totalAmount || trip.grandTotal || 0).toLocaleString()}</p>
+                          </div>
+                          <p className="text-[10px] font-bold text-slate-400 mt-2 border-t border-slate-100 pt-1">
+                            {trip.createdAt || trip.date ? new Date(trip.createdAt || trip.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                          </p>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+
+                {/* Expenses List */}
+                <div className="bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden flex flex-col h-[400px]">
+                  <div className="px-4 py-3 border-b border-slate-50 bg-slate-50/50 flex items-center gap-2">
+                    <TrendingDown size={14} className="text-red-500" />
+                    <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest">Expenses Logged</h3>
+                  </div>
+                  <div className="overflow-y-auto flex-1 p-2 space-y-2">
+                    {(() => {
+                      const exps = rawExpenses.filter(e => {
+                        if (e.carId !== selectedCarMetrics.id) return false;
+                        const dStr = e.createdAt || e.date || '';
+                        if (!dStr) return false;
+                        const d = new Date(dStr);
+                        if (appliedFilters.dateFilterType === 'this_month') {
+                          const now = new Date();
+                          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                        }
+                        if (appliedFilters.dateFilterType === 'month' && appliedFilters.filterMonth) {
+                          const [yyyy, mm] = appliedFilters.filterMonth.split('-');
+                          return d.getFullYear() === parseInt(yyyy) && d.getMonth() === parseInt(mm) - 1;
+                        }
+                        if (appliedFilters.dateFilterType === 'custom' && appliedFilters.startDate && appliedFilters.endDate) {
+                          const start = new Date(appliedFilters.startDate);
+                          const end = new Date(appliedFilters.endDate);
+                          end.setHours(23, 59, 59, 999);
+                          return d >= start && d <= end;
+                        }
+                        return true;
+                      });
+
+                      if (exps.length === 0) return <p className="text-xs text-slate-400 text-center py-8 font-semibold">No expenses found in this period.</p>;
+
+                      return exps.map((exp, idx) => (
+                        <div key={idx} className="p-3 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors">
+                          <div className="flex justify-between items-start mb-2">
+                            <p className="text-xs font-bold text-slate-800">{exp.description || exp.label}</p>
+                            <p className="text-xs font-black text-red-600">₹ {(exp.amount || 0).toLocaleString()}</p>
+                          </div>
+                          <div className="flex justify-between items-center border-t border-slate-100 pt-1 mt-2">
+                            <span className="text-[9px] font-black px-2 py-0.5 rounded bg-slate-100 text-slate-500 capitalize">{exp.category || 'General'}</span>
+                            <p className="text-[10px] font-bold text-slate-400">
+                              {exp.createdAt || exp.date ? new Date(exp.createdAt || exp.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                            </p>
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
