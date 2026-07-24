@@ -133,6 +133,8 @@ export interface InvoiceData {
   enableExtraHours?: boolean;
   extraHours?: number;
   extraHourRate?: number;
+  enableMinHours?: boolean;
+  minHours?: number;
 }
 
 export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blob; fileName: string }> => {
@@ -407,8 +409,16 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<{ blob: Blo
     case 'hour':
       // Hours * Rate per Hour + Chargeable KM * Charge per KM
       if (data.hours > 0 && data.ratePerHour > 0) {
-        const hourCharge = data.hours * data.ratePerHour;
-        tableBody.push([`Vehicle Rent (${data.hours} hrs @ Rs${data.ratePerHour}/hr)`, hourCharge.toFixed(2)]);
+        let hourCharge = data.hours * data.ratePerHour;
+        let desc = `Vehicle Rent (${data.hours} hrs @ Rs${data.ratePerHour}/hr)`;
+        
+        if (data.enableMinHours && data.hours < (data.minHours || 0)) {
+          const minHrs = data.minHours || 0;
+          hourCharge = minHrs * data.ratePerHour;
+          desc = `Vehicle Rent (${data.hours} hrs, Billed Min ${minHrs} hrs @ Rs${data.ratePerHour}/hr)`;
+        }
+        
+        tableBody.push([desc, hourCharge.toFixed(2)]);
       }
       if (data.chargeableKm > 0 && data.chargePerKmHour > 0) {
         const kmCharge = data.chargeableKm * data.chargePerKmHour;

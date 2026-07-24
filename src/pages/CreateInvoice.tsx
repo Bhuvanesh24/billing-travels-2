@@ -150,6 +150,8 @@ export default function CreateInvoice() {
   const [chargePerKmHour, setChargePerKmHour] = useState(0);
   const [extraHours, setExtraHours] = useState(0);
   const [extraHourRate, setExtraHourRate] = useState(0);
+  const [enableMinHours, setEnableMinHours] = useState(false);
+  const [minHours, setMinHours] = useState(0);
 
   // Additional Costs
   const [additionalCosts, setAdditionalCosts] = useState<AdditionalCost[]>([]);
@@ -210,6 +212,8 @@ export default function CreateInvoice() {
             setChargePerKmHour(data.chargePerKmHour || 0);
             setExtraHours(data.extraHours || 0);
             setExtraHourRate(data.extraHourRate || 0);
+            setEnableMinHours(data.enableMinHours || false);
+            setMinHours(data.minHours || 0);
             setAdditionalCosts(data.additionalCosts || []);
             setEnableExtraHours(data.enableExtraHours || false);
             setEnableDriverBeta(data.enableDriverBeta || false);
@@ -250,6 +254,7 @@ export default function CreateInvoice() {
             setTripStartLocation(trip.tripStartLocation || '');
             setStartKm(trip.startKm || 0);
             setStartTime(trip.startTime || '');
+            setAdvance(trip.advanceAmount || 0);
             
             // Pre-fill from trip (End Details)
             setEndKm(trip.endKm || 0);
@@ -318,7 +323,8 @@ export default function CreateInvoice() {
         total = fixedAmount + (chargeableKm * chargePerKmFixed);
         break;
       case 'hour':
-        total = (hours * ratePerHour) + (chargeableKm * chargePerKmHour);
+        const billedHours = enableMinHours ? Math.max(hours, minHours) : hours;
+        total = (billedHours * ratePerHour) + (chargeableKm * chargePerKmHour);
         break;
       case 'day':
         total = (days * ratePerDay) + (chargeableKm * fuelChargePerKm);
@@ -431,6 +437,8 @@ export default function CreateInvoice() {
         ratePerKm,
         chargePerKmFixed,
         chargePerKmHour,
+        enableMinHours,
+        minHours,
         additionalCosts,
         enableDriverBeta,
         driverBetaDays,
@@ -529,6 +537,8 @@ export default function CreateInvoice() {
           ratePerKm,
           chargePerKmFixed,
           chargePerKmHour,
+          enableMinHours,
+          minHours,
           additionalCosts,
           enableDriverBeta,
           driverBetaDays,
@@ -956,6 +966,36 @@ export default function CreateInvoice() {
                       disabled
                     />
                   </div>
+                </div>
+              )}
+              {rentType === 'hour' && (
+                <div className="mb-4 bg-slate-50 border border-slate-100 p-4 rounded-xl flex flex-col sm:flex-row gap-4 items-end">
+                  <label className="flex items-center gap-3 cursor-pointer p-3 bg-white border border-slate-100 rounded-lg flex-1 shadow-sm">
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={enableMinHours}
+                        onChange={(e) => setEnableMinHours(e.target.checked)}
+                      />
+                      <div className={`block w-10 h-6 rounded-full transition-colors ${enableMinHours ? 'bg-blue-500' : 'bg-slate-300'}`}></div>
+                      <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${enableMinHours ? 'transform translate-x-4' : ''}`}></div>
+                    </div>
+                    <span className="text-sm font-bold text-slate-700">Apply Minimum Hours</span>
+                  </label>
+                  {enableMinHours && (
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Minimum Hours</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white shadow-sm"
+                        placeholder="e.g. 3"
+                        value={minHours || ''}
+                        onChange={e => setMinHours(Number(e.target.value))}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 

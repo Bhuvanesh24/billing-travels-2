@@ -31,6 +31,7 @@ interface LedgerEntry {
   type: 'income' | 'expense';
   name: string;
   date: string;
+  tripDate?: string;
   amount: number;
   category?: string;
 }
@@ -54,6 +55,7 @@ export default function Accounts() {
 
   // Filter State
   const defaultFilters = {
+    dateFilterTarget: 'bill' as 'bill' | 'trip',
     dateFilterType: 'this_month' as 'all' | 'this_month' | 'month' | 'custom',
     filterMonth: new Date().toISOString().slice(0, 7),
     startDate: '',
@@ -96,7 +98,9 @@ export default function Accounts() {
     if (!rawInvoices.length && !rawExpenses.length && !rawCars.length && !rawDrivers.length) return;
 
     const filteredInvoices = rawInvoices.filter(inv => {
-      const dStr = inv.createdAt || inv.date || '';
+      const dStr = appliedFilters.dateFilterTarget === 'trip' 
+        ? (inv.startTime || inv.createdAt || inv.date || '')
+        : (inv.createdAt || inv.date || '');
       if (!dStr) return false;
       const d = new Date(dStr);
       
@@ -151,6 +155,7 @@ export default function Accounts() {
       type: 'income',
       name: inv.customerName || 'Customer',
       date: inv.createdAt || inv.date,
+      tripDate: inv.startTime,
       amount: getAmt(inv),
       category: inv.paymentStatus === 'paid' ? 'Collected' : 'Pending',
     }));
@@ -225,7 +230,22 @@ export default function Accounts() {
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl flex flex-col sm:flex-row gap-4 items-end">
+      <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl flex flex-col sm:flex-row gap-4 items-end flex-wrap">
+        <div className="flex-1 min-w-[150px]">
+          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Filter Date By</label>
+          <div className="relative">
+            <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <select
+              className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 outline-none focus:border-blue-500 transition-colors"
+              value={draftFilters.dateFilterTarget}
+              onChange={(e) => setDraftFilters({ ...draftFilters, dateFilterTarget: e.target.value as any })}
+            >
+              <option value="bill">Bill Date</option>
+              <option value="trip">Trip Date</option>
+            </select>
+          </div>
+        </div>
+
         <div className="flex-1 min-w-[200px]">
           <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Time Period</label>
           <div className="relative">
@@ -363,7 +383,7 @@ export default function Accounts() {
                   <th className="px-8 py-3">Type</th>
                   <th className="px-8 py-3">Description</th>
                   <th className="px-8 py-3">Category</th>
-                  <th className="px-8 py-3">Date</th>
+                  <th className="px-8 py-3">Date (Trip / Bill)</th>
                   <th className="px-8 py-3 text-right">Amount</th>
                 </tr>
               </thead>
@@ -378,7 +398,14 @@ export default function Accounts() {
                     <td className="px-8 py-4 text-sm font-bold text-slate-900">{entry.name}</td>
                     <td className="px-8 py-4 text-xs text-slate-400 font-medium capitalize">{entry.category}</td>
                     <td className="px-8 py-4 text-xs text-slate-500">
-                      {entry.date ? new Date(entry.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                      {entry.type === 'income' ? (
+                        <div className="flex flex-col gap-0.5">
+                          {entry.tripDate && <span className="font-semibold text-slate-700">Trip: {new Date(entry.tripDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
+                          <span className="text-[10px]">Billed: {entry.date ? new Date(entry.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}</span>
+                        </div>
+                      ) : (
+                        entry.date ? new Date(entry.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'
+                      )}
                     </td>
                     <td className={`px-8 py-4 text-right font-black text-sm ${entry.type === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
                       {entry.type === 'income' ? '+' : '-'} ₹ {(entry.amount || 0).toLocaleString()}
@@ -564,7 +591,9 @@ export default function Accounts() {
                       const carRegNo = rawCars.find(c => c.id === selectedCarMetrics.id)?.regNo;
                       const trips = rawInvoices.filter(i => {
                         if (i.vehicleNo !== carRegNo) return false;
-                        const dStr = i.createdAt || i.date || '';
+                        const dStr = appliedFilters.dateFilterTarget === 'trip'
+                          ? (i.startTime || i.createdAt || i.date || '')
+                          : (i.createdAt || i.date || '');
                         if (!dStr) return false;
                         const d = new Date(dStr);
                         if (appliedFilters.dateFilterType === 'this_month') {
@@ -599,9 +628,10 @@ export default function Accounts() {
                             </div>
                             <p className="text-xs font-black text-emerald-600">₹ {(trip.totalAmount || trip.grandTotal || 0).toLocaleString()}</p>
                           </div>
-                          <p className="text-[10px] font-bold text-slate-400 mt-2 border-t border-slate-100 pt-1">
-                            {trip.createdAt || trip.date ? new Date(trip.createdAt || trip.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
-                          </p>
+                          <div className="text-[10px] font-bold text-slate-400 mt-2 border-t border-slate-100 pt-1 flex flex-col gap-0.5">
+                            {trip.startTime && <span className="text-slate-700">Trip: {new Date(trip.startTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
+                            <span>Billed: {trip.createdAt || trip.date ? new Date(trip.createdAt || trip.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}</span>
+                          </div>
                         </div>
                       ));
                     })()}

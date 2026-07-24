@@ -21,6 +21,7 @@ export interface Trip {
   startTime: string;
   tripStartLocation: string;
   status: 'ongoing' | 'completed';
+  advanceAmount?: number;
   
   // These are filled when ending the trip
   endKm?: number;

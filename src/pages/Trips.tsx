@@ -111,7 +111,8 @@ export default function Trips() {
     carId: '',
     startKm: 0,
     startTime: new Date().toISOString().slice(0, 16), // datetime-local format
-    tripStartLocation: ''
+    tripStartLocation: '',
+    advanceAmount: 0
   });
 
   // Outside (unregistered) driver / vehicle toggles
@@ -215,7 +216,7 @@ export default function Trips() {
       toast.success('Trip dispatched successfully');
       setIsStartModalOpen(false);
       // Reset form
-      setFormData({ customerId: '', driverId: '', carId: '', startKm: 0, startTime: new Date().toISOString().slice(0, 16), tripStartLocation: '' });
+      setFormData({ customerId: '', driverId: '', carId: '', startKm: 0, startTime: new Date().toISOString().slice(0, 16), tripStartLocation: '', advanceAmount: 0 });
       setUseOutsideDriver(false); setOutsideDriverName('');
       setUseOutsideVehicle(false); setOutsideVehicleName('');
       fetchTrips();
@@ -763,6 +764,19 @@ export default function Trips() {
                     value={formData.tripStartLocation}
                     onChange={(e) => setFormData({ ...formData, tripStartLocation: e.target.value })}
                   />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Advance Amount (Optional)</label>
+                  <div className="relative">
+                    <IndianRupee size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="number" placeholder="0"
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm font-bold text-slate-900 shadow-sm"
+                      value={formData.advanceAmount || ''}
+                      onChange={(e) => setFormData({ ...formData, advanceAmount: Number(e.target.value) })}
+                    />
+                  </div>
                 </div>
               </div>
 
