@@ -17,6 +17,8 @@ export interface Trip {
   customerId: string;
   driverId: string;
   carId: string;
+  vendorId?: string;
+  vendorName?: string;
   startKm: number;
   startTime: string;
   tripStartLocation: string;

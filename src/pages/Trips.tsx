@@ -103,6 +103,7 @@ export default function Trips() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [cars, setCars] = useState<Car[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [vendors, setVendors] = useState<any[]>([]);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -120,6 +121,7 @@ export default function Trips() {
   const [outsideDriverName, setOutsideDriverName] = useState('');
   const [useOutsideVehicle, setUseOutsideVehicle] = useState(false);
   const [outsideVehicleName, setOutsideVehicleName] = useState('');
+  const [outsideVendorId, setOutsideVendorId] = useState('');
 
   // Complete & Edit Modal State
   const [activeTrip, setActiveTrip] = useState<Trip | null>(null);
@@ -159,14 +161,16 @@ export default function Trips() {
 
   async function fetchMasters() {
     try {
-      const [d, c, cust] = await Promise.all([
+      const [d, c, cust, v] = await Promise.all([
         masterService.getDrivers(),
         masterService.getCars(),
-        masterService.getCustomers()
+        masterService.getCustomers(),
+        masterService.getVendors()
       ]);
       setDrivers(d.filter(dri => dri.status === 'active'));
       setCars(c);
       setCustomers(cust);
+      setVendors(v);
     } catch (error) {
       console.error('Error fetching masters:', error);
     }
@@ -198,19 +202,26 @@ export default function Trips() {
       toast.error('Please enter the outside vehicle details');
       return;
     }
+    if (useOutsideVehicle && !outsideVendorId) {
+      toast.error('Please select a Vendor for the outside vehicle');
+      return;
+    }
 
     try {
       const customer = customers.find(c => c.id === formData.customerId);
       const driver = useOutsideDriver ? null : drivers.find(d => d.id === formData.driverId);
       const car = useOutsideVehicle ? null : cars.find(c => c.id === formData.carId);
+      const vendor = useOutsideVehicle ? vendors.find(v => v.id === outsideVendorId) : null;
 
       await tripService.startTrip({
         ...formData,
         driverId: useOutsideDriver ? '' : formData.driverId,
         carId: useOutsideVehicle ? '' : formData.carId,
+        vendorId: useOutsideVehicle ? outsideVendorId : '',
         customerName: customer?.companyName || '',
         driverName: useOutsideDriver ? outsideDriverName.trim() : (driver?.name || ''),
-        vehicleNo: useOutsideVehicle ? outsideVehicleName.trim() : (car?.regNo || '')
+        vehicleNo: useOutsideVehicle ? outsideVehicleName.trim() : (car?.regNo || ''),
+        vendorName: vendor?.name || ''
       });
 
       toast.success('Trip dispatched successfully');
@@ -218,7 +229,7 @@ export default function Trips() {
       // Reset form
       setFormData({ customerId: '', driverId: '', carId: '', startKm: 0, startTime: new Date().toISOString().slice(0, 16), tripStartLocation: '', advanceAmount: 0 });
       setUseOutsideDriver(false); setOutsideDriverName('');
-      setUseOutsideVehicle(false); setOutsideVehicleName('');
+      setUseOutsideVehicle(false); setOutsideVehicleName(''); setOutsideVendorId('');
       fetchTrips();
     } catch (error) {
       console.error(error);
@@ -677,13 +688,23 @@ export default function Trips() {
                       </button>
                     </div>
                     {useOutsideVehicle ? (
-                      <input
-                        type="text"
-                        placeholder="e.g. TN 01 AB 1234 - Innova"
-                        className="w-full px-3 py-2 bg-amber-50 border border-amber-300 rounded-md focus:border-amber-500 focus:ring-1 focus:ring-amber-400 outline-none transition-all text-sm font-semibold text-slate-800 shadow-sm"
-                        value={outsideVehicleName}
-                        onChange={(e) => setOutsideVehicleName(e.target.value)}
-                      />
+                      <div className="space-y-2">
+                        <select
+                          className="w-full px-3 py-2 bg-amber-50 border border-amber-300 rounded-md focus:border-amber-500 focus:ring-1 focus:ring-amber-400 outline-none transition-all text-sm font-semibold text-slate-800 shadow-sm"
+                          value={outsideVendorId}
+                          onChange={(e) => setOutsideVendorId(e.target.value)}
+                        >
+                          <option value="">Select Vendor...</option>
+                          {vendors.map((v: any) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                        </select>
+                        <input
+                          type="text"
+                          placeholder="Vehicle No (e.g. TN01AB1234)"
+                          className="w-full px-3 py-2 bg-amber-50 border border-amber-300 rounded-md focus:border-amber-500 focus:ring-1 focus:ring-amber-400 outline-none transition-all text-sm font-semibold text-slate-800 shadow-sm"
+                          value={outsideVehicleName}
+                          onChange={(e) => setOutsideVehicleName(e.target.value)}
+                        />
+                      </div>
                     ) : (
                       <select
                         className="w-full px-3 py-2 bg-white border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm font-semibold text-slate-700 shadow-sm"

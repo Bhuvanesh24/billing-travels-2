@@ -42,7 +42,7 @@ export default function Accounts() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
 
-  const [totals, setTotals] = useState({ revenue: 0, expenses: 0, netProfit: 0, pendingRevenue: 0 });
+  const [totals, setTotals] = useState({ revenue: 0, expenses: 0, vendorPayouts: 0, netProfit: 0, pendingRevenue: 0 });
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [carMetrics, setCarMetrics] = useState<BusinessMetric[]>([]);
   const [driverMetrics, setDriverMetrics] = useState<BusinessMetric[]>([]);
@@ -52,6 +52,7 @@ export default function Accounts() {
   const [rawExpenses, setRawExpenses] = useState<any[]>([]);
   const [rawCars, setRawCars] = useState<any[]>([]);
   const [rawDrivers, setRawDrivers] = useState<any[]>([]);
+  const [rawVendorBills, setRawVendorBills] = useState<any[]>([]);
 
   // Filter State
   const defaultFilters = {
@@ -75,17 +76,19 @@ export default function Accounts() {
   async function fetchData() {
     try {
       setLoading(true);
-      const [invSnap, expSnap, carSnap, driSnap] = await Promise.all([
+      const [invSnap, expSnap, carSnap, driSnap, vendBillSnap] = await Promise.all([
         getDocs(collection(db, 'invoices')),
         getDocs(collection(db, 'car_expenses')),
         getDocs(collection(db, 'cars')),
         getDocs(collection(db, 'drivers')),
+        getDocs(collection(db, 'vendor_bills'))
       ]);
 
       setRawInvoices(invSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setRawExpenses(expSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setRawCars(carSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setRawDrivers(driSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setRawVendorBills(vendBillSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (error) {
       console.error(error);
       toast.error('Failed to load accounting data');
@@ -143,12 +146,41 @@ export default function Accounts() {
       return true;
     });
 
+    const filteredVendorBills = rawVendorBills.filter(bill => {
+      const dStr = bill.date || bill.createdAt || '';
+      if (!dStr) return false;
+      const d = new Date(dStr);
+      
+      if (appliedFilters.dateFilterType === 'this_month') {
+        const now = new Date();
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      }
+      if (appliedFilters.dateFilterType === 'month' && appliedFilters.filterMonth) {
+        const [yyyy, mm] = appliedFilters.filterMonth.split('-');
+        return d.getFullYear() === parseInt(yyyy) && d.getMonth() === parseInt(mm) - 1;
+      }
+      if (appliedFilters.dateFilterType === 'custom' && appliedFilters.startDate && appliedFilters.endDate) {
+        const start = new Date(appliedFilters.startDate);
+        const end = new Date(appliedFilters.endDate);
+        end.setHours(23, 59, 59, 999);
+        return d >= start && d <= end;
+      }
+      return true;
+    });
+
     const getAmt = (inv: any) => inv.totalAmount || inv.grandTotal || 0;
 
     const revenue = filteredInvoices.reduce((s: number, i: any) => s + getAmt(i), 0);
     const pendingRevenue = filteredInvoices.filter((i: any) => i.paymentStatus === 'pending').reduce((s: number, i: any) => s + getAmt(i), 0);
     const totalExpenses = filteredExpenses.reduce((s: number, e: any) => s + (e.amount || 0), 0);
-    setTotals({ revenue, expenses: totalExpenses, netProfit: revenue - totalExpenses, pendingRevenue });
+    const vendorPayouts = filteredVendorBills.reduce((s: number, b: any) => s + (b.amount || 0), 0);
+    setTotals({ 
+      revenue, 
+      expenses: totalExpenses, 
+      vendorPayouts,
+      netProfit: revenue - totalExpenses - vendorPayouts, 
+      pendingRevenue 
+    });
 
     // Ledger
     const incomeEntries: LedgerEntry[] = filteredInvoices.map((inv: any) => ({
@@ -166,7 +198,14 @@ export default function Accounts() {
       amount: exp.amount || 0,
       category: exp.category || 'General',
     }));
-    const allEntries = [...incomeEntries, ...expenseEntries]
+    const vendorBillEntries: LedgerEntry[] = filteredVendorBills.map((bill: any) => ({
+      type: 'expense',
+      name: `Vendor Bill - ${bill.vendorName}`,
+      date: bill.date || bill.createdAt,
+      amount: bill.amount || 0,
+      category: 'Vendor Payout',
+    }));
+    const allEntries = [...incomeEntries, ...expenseEntries, ...vendorBillEntries]
       .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
     setLedger(allEntries);
 
@@ -187,7 +226,7 @@ export default function Accounts() {
     }).sort((a: BusinessMetric, b: BusinessMetric) => b.revenue - a.revenue);
     setDriverMetrics(dm);
 
-  }, [rawInvoices, rawExpenses, rawCars, rawDrivers, appliedFilters]);
+  }, [rawInvoices, rawExpenses, rawCars, rawDrivers, rawVendorBills, appliedFilters]);
 
   const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
     { id: 'overview', label: 'Overview', icon: <TrendingUp size={16} /> },
@@ -329,9 +368,10 @@ export default function Accounts() {
       {activeTab === 'overview' && (
         <div className="space-y-6">
           {/* Big P&L Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5">
             <MetricPill label="Gross Revenue" value={`₹ ${totals.revenue.toLocaleString()}`} color="bg-emerald-600 text-white" />
-            <MetricPill label="Total Expenses" value={`₹ ${totals.expenses.toLocaleString()}`} color="bg-red-50 text-red-700" />
+            <MetricPill label="Fleet Expenses" value={`₹ ${totals.expenses.toLocaleString()}`} color="bg-red-50 text-red-700" />
+            <MetricPill label="Vendor Payouts" value={`₹ ${totals.vendorPayouts.toLocaleString()}`} color="bg-amber-50 text-amber-700" />
             <MetricPill label="Net Profit" value={`₹ ${totals.netProfit.toLocaleString()}`} color={totals.netProfit >= 0 ? 'bg-indigo-600 text-white' : 'bg-red-600 text-white'} />
             <MetricPill label="Pending Collection" value={`₹ ${totals.pendingRevenue.toLocaleString()}`} color="bg-orange-50 text-orange-700" />
           </div>
@@ -346,6 +386,7 @@ export default function Accounts() {
                 { label: 'Revenue (Paid Invoices)', value: totals.revenue - totals.pendingRevenue, color: 'text-emerald-600', icon: <TrendingUp size={16} className="text-emerald-500" /> },
                 { label: 'Revenue (Pending Invoices)', value: totals.pendingRevenue, color: 'text-orange-500', icon: <IndianRupee size={16} className="text-orange-400" /> },
                 { label: 'Fleet Expenses', value: -totals.expenses, color: 'text-red-600', icon: <TrendingDown size={16} className="text-red-500" /> },
+                { label: 'Vendor Payouts', value: -totals.vendorPayouts, color: 'text-amber-600', icon: <TrendingDown size={16} className="text-amber-500" /> },
               ].map((row) => (
                 <div key={row.label} className="px-8 py-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
                   <div className="flex items-center gap-3">

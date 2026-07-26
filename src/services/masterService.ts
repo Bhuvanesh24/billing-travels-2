@@ -42,10 +42,28 @@ export interface Customer {
   createdAt?: string;
 }
 
+export interface Vendor {
+  id?: string;
+  name: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  gstNo?: string;
+  bankDetails?: {
+    accountName: string;
+    accountNumber: string;
+    bankName: string;
+    ifsc: string;
+  };
+  createdAt?: string;
+}
+
 const COLLECTIONS = {
   DRIVERS: 'drivers',
   CARS: 'cars',
-  CUSTOMERS: 'customers'
+  CUSTOMERS: 'customers',
+  VENDORS: 'vendors'
 };
 
 // Generic CRUD operations
@@ -110,5 +128,29 @@ export const masterService = {
   },
   async deleteCustomer(id: string) {
     return await deleteDoc(doc(db, COLLECTIONS.CUSTOMERS, id));
+  },
+  
+  // --- VENDORS ---
+  async getVendors() {
+    const q = query(collection(db, COLLECTIONS.VENDORS), orderBy('name'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Vendor));
+  },
+
+  async addVendor(vendor: Omit<Vendor, 'id'>) {
+    return await addDoc(collection(db, COLLECTIONS.VENDORS), {
+      ...vendor,
+      createdAt: new Date().toISOString()
+    });
+  },
+
+  async updateVendor(id: string, vendor: Partial<Vendor>) {
+    const ref = doc(db, COLLECTIONS.VENDORS, id);
+    return await updateDoc(ref, vendor);
+  },
+
+  async deleteVendor(id: string) {
+    const ref = doc(db, COLLECTIONS.VENDORS, id);
+    return await deleteDoc(ref);
   }
 };

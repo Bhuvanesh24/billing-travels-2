@@ -8,6 +8,8 @@ import Drivers from './pages/Drivers';
 import Cars from './pages/Cars';
 import Accounts from './pages/Accounts';
 import CreateInvoice from './pages/CreateInvoice';
+import Vendors from './pages/Vendors';
+import VendorBills from './pages/VendorBills';
 import { DriveProvider } from './services/DriveContext';
 import { AuthProvider, useAuth } from './services/AuthContext';
 import { Toaster } from 'react-hot-toast';
@@ -83,6 +85,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Accounts />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/vendors"
+        element={
+          <ProtectedRoute>
+            <Vendors />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/vendor-bills"
+        element={
+          <ProtectedRoute>
+            <VendorBills />
           </ProtectedRoute>
         }
       />
